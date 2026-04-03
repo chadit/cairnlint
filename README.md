@@ -1,9 +1,11 @@
 # cairnlint
 
 Custom Go static analysis tool built on
-`golang.org/x/tools/go/analysis`. 31 analyzers covering
+`golang.org/x/tools/go/analysis`. 32 analyzers covering
 scope-aware checks, loop-body rules, expression patterns,
-and code quality enforcement.
+and code quality enforcement. Generated files (`.pb.go`,
+`/gen/`, `// Code generated ... DO NOT EDIT.`) are
+automatically skipped.
 
 ## Install
 
@@ -116,7 +118,7 @@ linters:
 ./custom-gcl run ./...
 ```
 
-All 31 analyzers run as part of the golangci-lint
+All 32 analyzers run as part of the golangci-lint
 pipeline alongside your other linters.
 
 ## Testing
@@ -130,7 +132,7 @@ Tests use `analysistest.Run` with fixture files in
 `analyzers/testdata/src/`. Each fixture contains
 `// want` comments marking expected diagnostics.
 
-## Analyzers (31)
+## Analyzers (32)
 
 ### Scope-dependent (synctest exemption)
 
@@ -150,6 +152,7 @@ Tests use `analysistest.Run` with fixture files in
 | `stringconcatinloop` | `s += x` or `s = s + x` in loops |
 | `preferbloop` | `b.N` loops in benchmarks |
 | `dbquerywithbarebackground` | `db.*Context(ctx.Background())` |
+| `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
 | `noelse` | `if-else` blocks (use early returns) |
 
 ### Expression-level

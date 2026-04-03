@@ -32,6 +32,9 @@ func All() []*analysis.Analyzer {
 		noTestifySuitesAnalyzer(),
 		preferVarZeroAnalyzer(),
 
+		// Phase 3b: net/http rules
+		noDefaultHTTPClientAnalyzer(),
+
 		// Phase 4: grep check replacements
 		commentedOutCodeAnalyzer(),
 		discardedContextAnalyzer(),
