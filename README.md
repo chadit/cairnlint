@@ -44,6 +44,25 @@ cairnlint -tags=integration ./...
 cairnlint resolves packages relative to the caller's
 working directory. Run it from any Go module root.
 
+## Suppressing Diagnostics
+
+Add a `//nolint` comment on the same line as the
+diagnostic to suppress it:
+
+```go
+// Suppress a specific analyzer.
+s := "" //nolint:prefervarzero
+
+// Suppress multiple analyzers.
+s := "" //nolint:prefervarzero,noelse
+
+// Suppress all cairnlint analyzers on this line.
+s := "" //nolint
+```
+
+This works in both standalone mode and when running
+as a golangci-lint plugin.
+
 ## golangci-lint Integration
 
 cairnlint can run as a module plugin inside a custom

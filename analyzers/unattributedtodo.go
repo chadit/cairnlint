@@ -8,13 +8,15 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// taskMarkerPattern matches comment lines containing task markers
-// (the marker keyword followed by a word boundary).
-var taskMarkerPattern = regexp.MustCompile(`\b(TODO|FIXME|HACK|XXX)\b`)
+// taskMarkerPattern matches standalone task markers at the start of a
+// comment's content (after optional whitespace). Requires the keyword to
+// be followed by a non-alphanumeric character or end-of-string, avoiding
+// false positives on identifiers like context.TODO() or prose references.
+var taskMarkerPattern = regexp.MustCompile(`(?m)^\s*(TODO|FIXME|HACK|XXX)(?:\s|[:(]|$)`)
 
 // attributionPattern matches task markers that have an owner (name) or
 // a ticket reference like PROJ-123 immediately after the keyword.
-var attributionPattern = regexp.MustCompile(`\b(TODO|FIXME|HACK|XXX)\s*(\([^)]+\)|[A-Z]+-\d+)`)
+var attributionPattern = regexp.MustCompile(`(?m)^\s*(TODO|FIXME|HACK|XXX)\s*(\([^)]+\)|[A-Z]+-\d+)`)
 
 // unattributedTODOAnalyzer returns an analyzer that flags comment lines
 // containing task markers without an owner or ticket reference. Every marker

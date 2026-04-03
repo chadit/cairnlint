@@ -17,5 +17,11 @@ package unattributedtodo
 // Not a task marker at all.
 // This is a regular comment.
 
+// Not flagged: TODO embedded in an identifier reference.
+// The context.TODO() function returns a non-nil empty context.
+
+// Not flagged: TODO/FIXME in prose, not as a task directive.
+// This analyzer flags TODO/FIXME/HACK/XXX markers at comment start.
+
 // Placeholder keeps the package compilable.
 func Placeholder() {}

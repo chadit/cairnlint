@@ -5,7 +5,7 @@ import "os"
 // BadDeferInForLoop shows a classic resource leak pattern.
 func BadDeferInForLoop(paths []string) {
 	for _, path := range paths {
-		f, err := os.Open(path)
+		f, err := os.Open(path) // #nosec G304 -- test fixture
 		if err != nil {
 			continue
 		}
@@ -26,7 +26,7 @@ func BadDeferInCStyleLoop(n int) {
 
 // GoodDeferOutsideLoop is fine because the deferred call is at function scope.
 func GoodDeferOutsideLoop() {
-	f, err := os.Open("file.txt")
+	f, err := os.Open("file.txt") // #nosec G304 -- test fixture
 	if err != nil {
 		return
 	}
@@ -38,7 +38,7 @@ func GoodDeferOutsideLoop() {
 func GoodClosureInsideLoop(paths []string) {
 	for _, path := range paths {
 		func() {
-			f, err := os.Open(path)
+			f, err := os.Open(path) // #nosec G304 -- test fixture
 			if err != nil {
 				return
 			}

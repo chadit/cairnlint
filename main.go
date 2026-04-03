@@ -9,5 +9,5 @@ import (
 )
 
 func main() {
-	multichecker.Main(analyzers.All()...)
+	multichecker.Main(analyzers.WrapWithNolint(analyzers.All())...)
 }
