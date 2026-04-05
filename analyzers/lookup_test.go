@@ -17,3 +17,15 @@ func findAnalyzer(name string) *analysis.Analyzer {
 
 	panic("analyzer not found: " + name)
 }
+
+// findAgentAnalyzer returns the analyzer with the given name from the
+// agent-only registry. Panics if no match.
+func findAgentAnalyzer(name string) *analysis.Analyzer {
+	for _, a := range analyzers.AgentOnly() {
+		if a.Name == name {
+			return a
+		}
+	}
+
+	panic("agent analyzer not found: " + name)
+}

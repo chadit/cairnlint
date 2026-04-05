@@ -1,11 +1,12 @@
 # cairnlint
 
 Custom Go static analysis tool built on
-`golang.org/x/tools/go/analysis`. 32 analyzers covering
-scope-aware checks, loop-body rules, expression patterns,
-and code quality enforcement. Generated files (`.pb.go`,
-`/gen/`, `// Code generated ... DO NOT EDIT.`) are
-automatically skipped.
+`golang.org/x/tools/go/analysis`. 32 standard analyzers
+plus an agent-only tier for AI-assisted code review.
+Covers scope-aware checks, loop-body rules, expression
+patterns, and code quality enforcement. Generated files
+(`.pb.go`, `/gen/`, `// Code generated ... DO NOT EDIT.`)
+are automatically skipped.
 
 ## Install
 
@@ -41,10 +42,150 @@ cairnlint -synctestsleep ./...
 
 # With build tags
 cairnlint -tags=integration ./...
+
+# Enable agent mode (heuristic analyzers for LLM triage)
+cairnlint --agent ./...
 ```
 
 cairnlint resolves packages relative to the caller's
 working directory. Run it from any Go module root.
+
+## Agent Mode
+
+cairnlint has a second tier of analyzers designed for
+AI-assisted code review. These produce heuristic-based
+diagnostics that have a higher false-positive rate than
+the standard set. An LLM can read the output, check
+usage patterns, and decide what's a real issue. A human
+would find the noise distracting.
+
+When agent mode is active, agent diagnostics are written
+to a temp file at `/tmp/cairnlint-agent-<PID>.txt`
+instead of stdout. A single summary line is printed to
+stderr:
+
+```text
+[agent] heuristic findings written to /tmp/cairnlint-agent-12345.txt
+```
+
+Standard diagnostics still go to stdout as usual. If the
+temp file can't be created, agent diagnostics fall back
+to stdout.
+
+### Enabling agent mode
+
+There are three ways to enable it. Use whichever fits
+your setup.
+
+#### Pass the --agent flag
+
+```bash
+cairnlint --agent ./...
+```
+
+Works with any tool or script. The flag is stripped
+before the analysis framework parses its own flags.
+
+#### Auto-detection via environment variables
+
+cairnlint checks for environment variables set by
+popular AI coding tools. If any are present, agent
+mode turns on automatically with no flag needed.
+
+| Tool | Env var |
+| ---- | ---- |
+| Emerging standards | `AI_AGENT`, `AGENT` |
+| Claude Code | `CLAUDECODE` |
+| Codex CLI | `CODEX_SANDBOX`, `CODEX_THREAD_ID` |
+| Gemini CLI | `GEMINI_CLI` |
+| Cursor | `CURSOR_AGENT` |
+| Qwen Code | `QWEN_CODE` |
+| Goose | `GOOSE_TERMINAL` |
+| Cline | `CLINE_ACTIVE` |
+| Augment Code | `AUGMENT_AGENT` |
+| TRAE AI | `TRAE_AI_SHELL_ID` |
+| OpenCode | `OPENCODE_CLIENT` |
+| Any tool | `CAIRNLINT_AGENT` |
+
+#### Set CAIRNLINT_AGENT=1 for tools without auto-detection
+
+Some tools (Aider, Continue.dev, Windsurf) don't set
+identifying environment variables. For these, set
+`CAIRNLINT_AGENT=1` in the tool's configuration:
+
+```bash
+# In your shell profile, tool config, or CI env
+export CAIRNLINT_AGENT=1
+```
+
+### Setting env vars in specific tools
+
+**Claude Code** already sets `CLAUDECODE=1` by default,
+so auto-detection works out of the box. No setup needed.
+
+**Codex CLI** sets `CODEX_SANDBOX` and `CODEX_THREAD_ID`
+for every subprocess. Auto-detection works automatically.
+
+**Gemini CLI** sets `GEMINI_CLI=1` in shell commands.
+Auto-detection works automatically.
+
+**Cursor** sets `CURSOR_AGENT=1`. Auto-detection works
+automatically.
+
+**Aider** does not set any identifying env vars. Add
+this to your `.env` file or shell profile:
+
+```bash
+export CAIRNLINT_AGENT=1
+```
+
+**Continue.dev** does not set identifying env vars. Set
+the variable in your Continue config or shell:
+
+```bash
+export CAIRNLINT_AGENT=1
+```
+
+**CI/CD pipelines** can set `CAIRNLINT_AGENT=1` when
+cairnlint runs as part of an AI-powered review step, or
+pass `--agent` directly.
+
+### How the LLM uses agent output
+
+The LLM's workflow looks like this:
+
+1. Run `cairnlint ./...` (agent mode activates via env
+   or flag)
+2. See the stderr summary: `[agent] heuristic findings
+   written to /tmp/cairnlint-agent-<PID>.txt`
+3. Read the file to see full diagnostics
+4. For each finding, check whether the flagged symbol has
+   legitimate non-test consumers (e.g. `rg "SymbolName"
+   --type go --glob '!*_test.go'`)
+5. Report genuine issues, dismiss false positives
+
+### Agent-only analyzers (1)
+
+| Analyzer | What it flags |
+| ---- | ---- |
+| `agentexportedintestfile` | Exported decls in augmented `_test.go` files |
+
+`agentexportedintestfile` flags exported func, var,
+const, and type declarations in same-package test files
+(package `foo`, not `foo_test`). Skips framework
+functions: TestXxx, BenchmarkXxx, FuzzXxx, ExampleXxx,
+TestMain.
+
+### Adding a new agent-only analyzer
+
+1. Create `analyzers/agent_<name>.go` with a constructor
+   function
+2. Create `analyzers/agent_<name>_test.go` using
+   `findAgentAnalyzer` and `analysistest.Run`
+3. Create `analyzers/testdata/src/<name>/` with fixture
+   files containing `// want` comments
+4. Register in `analyzers/agentmode.go` `AgentOnly()`
+5. Run `go test ./analyzers/` and `go build .`
 
 ## Suppressing Diagnostics
 
