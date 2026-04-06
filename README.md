@@ -190,17 +190,33 @@ TestMain.
 ## Suppressing Diagnostics
 
 Add a `//nolint` comment on the same line as the
-diagnostic to suppress it:
+diagnostic to suppress it. The name after `//nolint:`
+is the **analyzer name** (e.g., `queryinloop`), not
+the tool name. Analyzer names are listed in the tables
+in the [Analyzers](#analyzers-32) section below.
 
 ```go
-// Suppress a specific analyzer.
+// Suppress a specific analyzer by name.
 s := "" //nolint:prefervarzero
 
-// Suppress multiple analyzers.
+// Suppress multiple analyzers on the same line.
 s := "" //nolint:prefervarzero,noelse
 
 // Suppress all cairnlint analyzers on this line.
 s := "" //nolint
+```
+
+Common examples:
+
+```go
+// Database cleanup that isn't an N+1 pattern.
+db.Exec("TRUNCATE TABLE users") //nolint:queryinloop
+
+// Intentional use of context.Background in production code.
+db.QueryContext(context.Background(), query) //nolint:dbquerywithbarebackground
+
+// Sentinel error in a file that isn't errors.go.
+var ErrNotFound = errors.New("not found") //nolint:sentinelerrors
 ```
 
 This works in both standalone mode and when running

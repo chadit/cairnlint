@@ -25,7 +25,8 @@ func main() {
 // multichecker.Main parses flags (it would reject unknown flags).
 // Returns true if the flag was present.
 func consumeAgentFlag() bool {
-	found := false
+	var found bool
+
 	filtered := os.Args[:0]
 
 	for _, arg := range os.Args {

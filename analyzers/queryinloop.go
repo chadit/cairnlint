@@ -8,15 +8,16 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// queryMethods lists database method names that suggest an N+1 query pattern
-// when called inside a loop body.
-var queryMethods = map[string]struct{}{ //nolint:gochecknoglobals // package-internal lookup table
-	"Query":           {},
-	"QueryRow":        {},
-	"Exec":            {},
-	"QueryContext":    {},
-	"QueryRowContext": {},
-	"ExecContext":     {},
+// queryMethods maps database method names to the argument index where the SQL
+// query string appears. Context variants take a context.Context as the first
+// argument, so the query shifts to index 1.
+var queryMethods = map[string]int{ //nolint:gochecknoglobals // package-internal lookup table
+	"Query":           0,
+	"QueryRow":        0,
+	"Exec":            0,
+	"QueryContext":    1,
+	"QueryRowContext": 1,
+	"ExecContext":     1,
 }
 
 // queryInLoopAnalyzer returns an analyzer that flags database query calls
@@ -51,7 +52,13 @@ func runQueryInLoop(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		if !isDBQueryCall(call) {
+		sel, isSel := call.Fun.(*ast.SelectorExpr)
+		if !isSel {
+			return true
+		}
+
+		queryArgIdx, isDBCall := queryMethods[sel.Sel.Name]
+		if !isDBCall {
 			return true
 		}
 
@@ -59,8 +66,11 @@ func runQueryInLoop(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		sel, isSel := call.Fun.(*ast.SelectorExpr)
-		if !isSel {
+		// When the SQL string is built with fmt.Sprintf, the query structure
+		// varies per iteration (e.g., TRUNCATE on different tables). That's
+		// structurally different operations, not the N+1 pattern of repeating
+		// the same parameterized query with different bind values.
+		if hasDynamicQueryString(call, queryArgIdx) {
 			return true
 		}
 
@@ -72,15 +82,19 @@ func runQueryInLoop(pass *analysis.Pass) (any, error) {
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 }
 
-// isDBQueryCall reports whether call is a method call whose name matches
-// one of the known database query methods.
-func isDBQueryCall(call *ast.CallExpr) bool {
-	sel, isSel := call.Fun.(*ast.SelectorExpr)
-	if !isSel {
+// hasDynamicQueryString reports whether the SQL argument at queryArgIdx is
+// built with fmt.Sprintf. When the query itself is formatted per iteration
+// (e.g., different table names), the operations are structurally different
+// and not the N+1 anti-pattern.
+func hasDynamicQueryString(call *ast.CallExpr, queryArgIdx int) bool {
+	if queryArgIdx >= len(call.Args) {
 		return false
 	}
 
-	_, found := queryMethods[sel.Sel.Name]
+	inner, isCall := call.Args[queryArgIdx].(*ast.CallExpr)
+	if !isCall {
+		return false
+	}
 
-	return found
+	return isFmtSprintf(inner)
 }
