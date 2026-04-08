@@ -1,7 +1,7 @@
 # cairnlint
 
 Custom Go static analysis tool built on
-`golang.org/x/tools/go/analysis`. 32 standard analyzers
+`golang.org/x/tools/go/analysis`. Standard analyzers
 plus an agent-only tier for AI-assisted code review.
 Covers scope-aware checks, loop-body rules, expression
 patterns, and code quality enforcement. Generated files
@@ -193,7 +193,7 @@ Add a `//nolint` comment on the same line as the
 diagnostic to suppress it. The name after `//nolint:`
 is the **analyzer name** (e.g., `queryinloop`), not
 the tool name. Analyzer names are listed in the tables
-in the [Analyzers](#analyzers-32) section below.
+in the [Analyzers](#analyzers) section below.
 
 ```go
 // Suppress a specific analyzer by name.
@@ -275,7 +275,7 @@ linters:
 ./custom-gcl run ./...
 ```
 
-All 32 analyzers run as part of the golangci-lint
+All analyzers run as part of the golangci-lint
 pipeline alongside your other linters.
 
 ## Testing
@@ -289,7 +289,7 @@ Tests use `analysistest.Run` with fixture files in
 `analyzers/testdata/src/`. Each fixture contains
 `// want` comments marking expected diagnostics.
 
-## Analyzers (32)
+## Analyzers
 
 ### Scope-dependent (synctest exemption)
 
@@ -327,6 +327,27 @@ Tests use `analysistest.Run` with fixture files in
 | `typeassertnocheck` | `x := y.(Type)` without comma-ok |
 | `notestifysuites` | `suite.Suite` embedding |
 | `prefervarzero` | `s := ""` (use `var s string`) |
+| `reflectnokindcheck` | `reflect.Type.Fields()`/`NumField()` without Kind |
+| `bufferpeekstore` | `Peek()` result used after buffer mutation (SSA) |
+| `reflectinloop` | `reflect.ValueOf`/`TypeOf` inside loops |
+| `benchreportallocs` | Benchmark missing `b.ReportAllocs()` |
+| `benchresettimer` | Benchmark setup without `b.ResetTimer()` |
+| `buildergrow` | `strings.Builder` in loop without `Grow()` |
+| `mapprealloc` | Map populated in loop without capacity hint |
+| `typednilerror` | Typed nil returned as error interface (SSA) |
+| `stmtnoclose` | `db.Prepare` without `defer stmt.Close()` |
+| `chandirection` | Bidirectional `chan T` in function params |
+
+### Concurrency
+
+| Analyzer | What it flags |
+| ---- | ---- |
+| `wgaddbeforego` | `wg.Add` before `wg.Go` (double-counts WaitGroup) |
+| `gowggo` | `go wg.Go(...)` wrapping (races Add with Wait) |
+| `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
+| `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` |
+| `chandirclose` | `close()` on bidirectional channel param |
+| `poolresetbeforeput` | `sync.Pool.Put` without Reset (SSA) |
 
 ### Code quality
 
@@ -342,6 +363,8 @@ Tests use `analysistest.Run` with fixture files in
 | `noaaacomments` | `// Arrange/Act/Assert` comments |
 | `noinlinemocks` | Inline `MockFoo` structs in tests |
 | `unattributedtodo` | Unowned TODO/FIXME/HACK/XXX |
+| `testcryptoinprod` | Test crypto packages in production code |
+| `signalhandling` | `main()` with server but no signal handling |
 
 ## Adding a new analyzer
 

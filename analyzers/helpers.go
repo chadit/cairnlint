@@ -10,6 +10,10 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
+// testingPkgPath is the import path for the standard testing package,
+// extracted as a constant to satisfy goconst across benchmark analyzers.
+const testingPkgPath = "testing"
+
 // callMatcher describes a function call to flag in test files.
 type callMatcher struct {
 	pkgPath  string
@@ -161,4 +165,41 @@ func isFuncLitArg(call *ast.CallExpr, lit *ast.FuncLit) bool {
 	}
 
 	return false
+}
+
+// isBenchmarkFunc reports whether funcDecl is a benchmark function: name starts
+// with "Benchmark" and has a single parameter of type *testing.B.
+func isBenchmarkFunc(funcDecl *ast.FuncDecl, info *types.Info) bool {
+	if funcDecl.Name == nil || len(funcDecl.Name.Name) <= len("Benchmark") {
+		return false
+	}
+
+	if funcDecl.Name.Name[:len("Benchmark")] != "Benchmark" {
+		return false
+	}
+
+	if funcDecl.Type.Params == nil || len(funcDecl.Type.Params.List) != 1 {
+		return false
+	}
+
+	param := funcDecl.Type.Params.List[0]
+
+	paramType := info.TypeOf(param.Type)
+	if paramType == nil {
+		return false
+	}
+
+	ptr, isPtr := paramType.(*types.Pointer)
+	if !isPtr {
+		return false
+	}
+
+	named, isNamed := ptr.Elem().(*types.Named)
+	if !isNamed {
+		return false
+	}
+
+	obj := named.Obj()
+
+	return obj.Pkg() != nil && obj.Pkg().Path() == testingPkgPath && obj.Name() == "B"
 }

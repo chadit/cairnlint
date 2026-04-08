@@ -109,5 +109,5 @@ func isBNSelector(expr ast.Expr, info *types.Info) bool {
 
 	obj := named.Obj()
 
-	return obj.Pkg() != nil && obj.Pkg().Path() == "testing" && obj.Name() == "B"
+	return obj.Pkg() != nil && obj.Pkg().Path() == testingPkgPath && obj.Name() == "B"
 }

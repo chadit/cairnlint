@@ -20,6 +20,7 @@ func All() []*analysis.Analyzer {
 		noElseAnalyzer(),
 
 		// Phase 3: expression-level rules
+		mapPreallocAnalyzer(),
 		noUnderscoreTestNamesAnalyzer(),
 		noRuntimeNumGoroutineAnalyzer(),
 		noGenericErrorAnalyzer(),
@@ -31,11 +32,32 @@ func All() []*analysis.Analyzer {
 		typeAssertNoCheckAnalyzer(),
 		noTestifySuitesAnalyzer(),
 		preferVarZeroAnalyzer(),
+		reflectNoKindCheckAnalyzer(),
+		bufferPeekStoreAnalyzer(),
+		typedNilErrorAnalyzer(),
+		reflectInLoopAnalyzer(),
+		benchReportAllocsAnalyzer(),
+		benchResetTimerAnalyzer(),
+		builderGrowAnalyzer(),
 
 		// Phase 3b: net/http rules
 		noDefaultHTTPClientAnalyzer(),
+		httpClientTimeoutAnalyzer(),
 
-		// Phase 4: grep check replacements
+		// Phase 3c: concurrency rules
+		wgAddBeforeGoAnalyzer(),
+		goWGGoAnalyzer(),
+		wgDoneInWGGoAnalyzer(),
+		tickerLeakAnalyzer(),
+		chanDirectionAnalyzer(),
+		chanDirCloseAnalyzer(),
+		stmtNoCloseAnalyzer(),
+		poolResetBeforePutAnalyzer(),
+
+		// Phase 4: code quality
+		signalHandlingAnalyzer(),
+
+		// Phase 4b: grep check replacements
 		commentedOutCodeAnalyzer(),
 		discardedContextAnalyzer(),
 		sentinelErrorsAnalyzer(),
@@ -46,5 +68,6 @@ func All() []*analysis.Analyzer {
 		noAAACommentsAnalyzer(),
 		noInlineMocksAnalyzer(),
 		unattributedTODOAnalyzer(),
+		testCryptoInProdAnalyzer(),
 	}
 }
