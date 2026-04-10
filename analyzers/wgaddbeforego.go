@@ -352,7 +352,10 @@ func argsString(args []ast.Expr) string {
 		return ""
 	}
 
+	const avgArgLen = 8 // rough estimate: short identifier per arg plus separator
+
 	var buf strings.Builder
+	buf.Grow(len(args) * avgArgLen)
 
 	for idx, arg := range args {
 		argStr := exprString(arg)

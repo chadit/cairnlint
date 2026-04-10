@@ -51,7 +51,7 @@ func wrapAnalyzer(orig *analysis.Analyzer) *analysis.Analyzer {
 // buildNolintMap scans all comments in the pass and returns a set of
 // line numbers where a //nolint directive suppresses the given analyzer.
 func buildNolintMap(pass *analysis.Pass, analyzerName string) map[int]bool {
-	result := make(map[int]bool)
+	result := make(map[int]bool) //nolint:mapprealloc // size depends on nolint comment density, not file count
 
 	for _, file := range pass.Files {
 		for _, cg := range file.Comments {

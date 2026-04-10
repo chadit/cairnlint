@@ -68,3 +68,49 @@ func GoodBuilderInClosureInsideLoop(items []string) []string {
 	}
 	return results
 }
+
+// GoodSmallLiteralRange writes in a range loop over a small literal.
+func GoodSmallLiteralRange() string {
+	var sb strings.Builder
+	for _, item := range []string{"a", "b", "c"} {
+		sb.WriteString(item)
+	}
+	return sb.String()
+}
+
+// GoodSmallLiteralVar writes in a range loop over a small literal variable.
+func GoodSmallLiteralVar() string {
+	items := []string{"x", "y"}
+	var sb strings.Builder
+	for _, item := range items {
+		sb.WriteString(item)
+	}
+	return sb.String()
+}
+
+// GoodBoundarySevenLiteral ranges over exactly 7 elements (just under threshold).
+func GoodBoundarySevenLiteral() string {
+	var sb strings.Builder
+	for _, item := range []string{"a", "b", "c", "d", "e", "f", "g"} {
+		sb.WriteString(item)
+	}
+	return sb.String()
+}
+
+// BadLargeLiteralRange ranges over a literal with >= 8 elements.
+func BadLargeLiteralRange() string {
+	var sb strings.Builder
+	for _, item := range []string{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		sb.WriteString(item) // want `strings\.Builder\.WriteString\(\) in loop without Grow`
+	}
+	return sb.String()
+}
+
+// BadForStmtLoop uses a C-style for loop (always flagged, can't determine count).
+func BadForStmtLoop(n int) string {
+	var sb strings.Builder
+	for i := 0; i < n; i++ {
+		sb.WriteString("x") // want `strings\.Builder\.WriteString\(\) in loop without Grow`
+	}
+	return sb.String()
+}

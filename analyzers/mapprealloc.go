@@ -12,16 +12,31 @@ import (
 // capacity hint that are subsequently populated inside a range loop. Without
 // pre-allocation the runtime rehashes the map as it grows, wasting CPU and
 // memory.
+//
+// The -min-range-len flag (default 8) suppresses diagnostics when the range
+// source is a literal with fewer than that many elements. Maps <= 8 entries
+// fit in one bucket and may be stack-allocated, so pre-allocation offers no
+// benefit and can force a heap allocation.
 func mapPreallocAnalyzer() *analysis.Analyzer {
-	return &analysis.Analyzer{
+	var minRangeLen int
+
+	analyzer := &analysis.Analyzer{
 		Name:     "mapprealloc",
 		Doc:      "flags maps populated in range loops without a capacity hint; use make(map[K]V, len(source)) to pre-allocate",
-		Run:      runMapPrealloc,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
+
+	analyzer.Flags.IntVar(&minRangeLen, "min-range-len", defaultMinRangeLen,
+		"minimum range-source length to trigger diagnostic; literals below this size are skipped")
+
+	analyzer.Run = func(pass *analysis.Pass) (any, error) {
+		return runMapPrealloc(pass, minRangeLen)
+	}
+
+	return analyzer
 }
 
-func runMapPrealloc(pass *analysis.Pass) (any, error) {
+func runMapPrealloc(pass *analysis.Pass, minRangeLen int) (any, error) {
 	insp, castOK := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	if !castOK {
 		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
@@ -37,7 +52,7 @@ func runMapPrealloc(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		checkBlockForMapPrealloc(block.List, pass)
+		checkBlockForMapPrealloc(block.List, pass, minRangeLen)
 	})
 
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
@@ -46,7 +61,7 @@ func runMapPrealloc(pass *analysis.Pass) (any, error) {
 // checkBlockForMapPrealloc scans statements in a block looking for map
 // creations (make without capacity or empty composite literals) followed by a
 // range loop that assigns into the same map variable.
-func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass) {
+func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass, minRangeLen int) {
 	for idx, stmt := range stmts {
 		assignStmt, isAssign := stmt.(*ast.AssignStmt)
 		if !isAssign {
@@ -74,6 +89,12 @@ func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass) {
 			}
 
 			if rangeBodyAssignsToMap(rangeStmt.Body, mapName) {
+				// Small literal range source — skip but keep scanning for
+				// subsequent range loops that may have a larger source.
+				if litLen := rangeSourceLiteralLen(rangeStmt.X); litLen >= 0 && litLen < minRangeLen {
+					continue
+				}
+
 				pass.Reportf(
 					assignStmt.Pos(),
 					"map %s populated in range loop without capacity hint; use make(map[K]V, len(source)) to pre-allocate",

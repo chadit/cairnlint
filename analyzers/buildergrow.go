@@ -21,16 +21,30 @@ var builderWriteMethods = map[string]bool{ //nolint:gochecknoglobals // package-
 // builderGrowAnalyzer returns an analyzer that flags strings.Builder write
 // methods called inside loops without a preceding Grow. Without pre-allocation,
 // each write may trigger a reallocation, turning O(n) appends into O(n^2).
+//
+// The -min-range-len flag (default 8) suppresses diagnostics when the range
+// source is a literal with fewer than that many elements. Builder's doubling
+// strategy handles small iteration counts in 2-3 allocs.
 func builderGrowAnalyzer() *analysis.Analyzer {
-	return &analysis.Analyzer{
+	var minRangeLen int
+
+	analyzer := &analysis.Analyzer{
 		Name:     "buildergrow",
 		Doc:      "flags strings.Builder write methods inside loops without a preceding Grow(); without pre-allocation the builder reallocates on each write, causing O(n^2) behavior",
-		Run:      runBuilderGrow,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
+
+	analyzer.Flags.IntVar(&minRangeLen, "min-range-len", defaultMinRangeLen,
+		"minimum range-source length to trigger diagnostic; literals below this size are skipped")
+
+	analyzer.Run = func(pass *analysis.Pass) (any, error) {
+		return runBuilderGrow(pass, minRangeLen)
+	}
+
+	return analyzer
 }
 
-func runBuilderGrow(pass *analysis.Pass) (any, error) {
+func runBuilderGrow(pass *analysis.Pass, minRangeLen int) (any, error) {
 	insp, castOK := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
 	if !castOK {
 		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
@@ -80,6 +94,13 @@ func runBuilderGrow(pass *analysis.Pass) (any, error) {
 
 		if hasGrowBeforeLoop(stack, loopNode, receiver, pass.TypesInfo) {
 			return true
+		}
+
+		// For range loops over small literal sources, skip the diagnostic.
+		if rangeLoop, isRange := loopNode.(*ast.RangeStmt); isRange {
+			if litLen := rangeSourceLiteralLen(rangeLoop.X); litLen >= 0 && litLen < minRangeLen {
+				return true
+			}
 		}
 
 		pass.Reportf(
