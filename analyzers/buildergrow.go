@@ -96,6 +96,12 @@ func runBuilderGrow(pass *analysis.Pass, minRangeLen int) (any, error) {
 			return true
 		}
 
+		// Builder declared inside the loop body is scoped to a single
+		// iteration — no cross-iteration accumulation, so Grow is pointless.
+		if isDeclaredInsideLoop(loopNode, receiver, pass.TypesInfo) {
+			return true
+		}
+
 		// For range loops over small literal sources, skip the diagnostic.
 		if rangeLoop, isRange := loopNode.(*ast.RangeStmt); isRange {
 			if litLen := rangeSourceLiteralLen(rangeLoop.X); litLen >= 0 && litLen < minRangeLen {
@@ -214,6 +220,121 @@ func stmtContainsNode(stmt ast.Stmt, target ast.Node) bool {
 	})
 
 	return found
+}
+
+// isDeclaredInsideLoop reports whether a variable with the given receiver
+// name is declared inside the loop body as a strings.Builder. A builder
+// scoped to a single iteration has no cross-iteration accumulation, so
+// flagging it for a missing Grow is a false positive.
+func isDeclaredInsideLoop(loopNode ast.Node, receiver string, info *types.Info) bool {
+	var body *ast.BlockStmt
+
+	switch loop := loopNode.(type) {
+	case *ast.RangeStmt:
+		body = loop.Body
+	case *ast.ForStmt:
+		body = loop.Body
+	default:
+		return false
+	}
+
+	if body == nil {
+		return false
+	}
+
+	for _, stmt := range body.List {
+		switch decl := stmt.(type) {
+		case *ast.DeclStmt:
+			if varDeclDeclaresBuilder(decl, receiver, info) {
+				return true
+			}
+
+		case *ast.AssignStmt:
+			if shortVarDeclaresBuilder(decl, receiver, info) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// varDeclDeclaresBuilder reports whether a DeclStmt contains a var
+// declaration of the given name typed as strings.Builder.
+func varDeclDeclaresBuilder(decl *ast.DeclStmt, receiver string, info *types.Info) bool {
+	genDecl, isGen := decl.Decl.(*ast.GenDecl)
+	if !isGen {
+		return false
+	}
+
+	for _, spec := range genDecl.Specs {
+		valueSpec, isValue := spec.(*ast.ValueSpec)
+		if !isValue {
+			continue
+		}
+
+		for _, name := range valueSpec.Names {
+			if name.Name == receiver && isBuilderTypeExpr(valueSpec.Type, info) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// shortVarDeclaresBuilder reports whether a := assignment declares the
+// given name with a strings.Builder type on the right-hand side.
+func shortVarDeclaresBuilder(assign *ast.AssignStmt, receiver string, info *types.Info) bool {
+	if assign.Tok.String() != ":=" {
+		return false
+	}
+
+	for idx, lhs := range assign.Lhs {
+		ident, isIdent := lhs.(*ast.Ident)
+		if !isIdent || ident.Name != receiver {
+			continue
+		}
+
+		if idx < len(assign.Rhs) {
+			rhsType := info.TypeOf(assign.Rhs[idx])
+			if rhsType != nil && isBuilderType(rhsType) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// isBuilderTypeExpr checks whether a type expression refers to strings.Builder.
+func isBuilderTypeExpr(expr ast.Expr, info *types.Info) bool {
+	if expr == nil {
+		return false
+	}
+
+	tv, hasType := info.Types[expr]
+	if !hasType {
+		return false
+	}
+
+	return isBuilderType(tv.Type)
+}
+
+// isBuilderType checks whether a type (including pointers) is strings.Builder.
+func isBuilderType(t types.Type) bool {
+	if ptr, isPtr := t.(*types.Pointer); isPtr {
+		t = ptr.Elem()
+	}
+
+	named, isNamed := t.(*types.Named)
+	if !isNamed {
+		return false
+	}
+
+	obj := named.Obj()
+
+	return obj.Pkg() != nil && obj.Pkg().Path() == "strings" && obj.Name() == "Builder"
 }
 
 // stmtHasGrowCall reports whether stmt contains a call to Grow() on a

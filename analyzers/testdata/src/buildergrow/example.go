@@ -114,3 +114,38 @@ func BadForStmtLoop(n int) string {
 	}
 	return sb.String()
 }
+
+// GoodBuilderDeclaredInsideLoop declares the builder inside the loop body.
+// Each iteration creates a fresh builder with no cross-iteration accumulation.
+func GoodBuilderDeclaredInsideLoop(items []string) []string {
+	var results []string
+	for _, item := range items {
+		var sb strings.Builder
+		sb.WriteString(item)
+		sb.WriteString(" suffix")
+		results = append(results, sb.String())
+	}
+	return results
+}
+
+// GoodBuilderShortVarInsideLoop uses := to declare the builder inside the loop.
+func GoodBuilderShortVarInsideLoop(items []string) []string {
+	var results []string
+	for _, item := range items {
+		sb := strings.Builder{}
+		sb.WriteString(item)
+		results = append(results, sb.String())
+	}
+	return results
+}
+
+// GoodBuilderInsideForStmt declares the builder inside a C-style for loop.
+func GoodBuilderInsideForStmt(n int) []string {
+	var results []string
+	for i := 0; i < n; i++ {
+		var sb strings.Builder
+		sb.WriteString("item")
+		results = append(results, sb.String())
+	}
+	return results
+}
