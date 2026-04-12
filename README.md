@@ -45,6 +45,9 @@ cairnlint -tags=integration ./...
 
 # Enable agent mode (heuristic analyzers for LLM triage)
 cairnlint --agent ./...
+
+# List every analyzer grouped by category (no analysis performed)
+cairnlint --list
 ```
 
 cairnlint resolves packages relative to the caller's
@@ -221,6 +224,15 @@ var ErrNotFound = errors.New("not found") //nolint:sentinelerrors
 
 This works in both standalone mode and when running
 as a golangci-lint plugin.
+
+**Scope note:** a leading `//nolint` directive
+suppresses every line of the node it attaches to. Because
+the AST can attach one comment to more than one node
+(e.g., a function and its body), suppression occasionally
+covers a line or two beyond the most obvious target. The
+behavior is always a superset of what a reader expects,
+never a subset — if you need tighter scope, put the
+directive on the specific line instead.
 
 ## golangci-lint Integration
 
