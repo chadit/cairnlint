@@ -70,6 +70,7 @@ func Categories() []Category {
 				wgAddBeforeGoAnalyzer(),
 				goWGGoAnalyzer(),
 				wgDoneInWGGoAnalyzer(),
+				preferWGGoAnalyzer(),
 				tickerLeakAnalyzer(),
 				chanDirectionAnalyzer(),
 				chanDirCloseAnalyzer(),

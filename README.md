@@ -40,8 +40,11 @@ cairnlint -noelse=false ./...
 # Enable only one analyzer
 cairnlint -synctestsleep ./...
 
-# With build tags
+# With an explicit build tag
 cairnlint -tags=integration ./...
+
+# Auto-discover every build tag in the tree and lint each configuration
+cairnlint -tags=auto ./...
 
 # Enable agent mode (heuristic analyzers for LLM triage)
 cairnlint --agent ./...
@@ -52,6 +55,38 @@ cairnlint --list
 
 cairnlint resolves packages relative to the caller's
 working directory. Run it from any Go module root.
+
+### Build tags
+
+Files behind `//go:build <tag>` are invisible to the
+analysis framework unless the tag is set. Two flags
+handle the usual cases.
+
+`-tags=<value>` forwards the tag into `GOFLAGS` so
+`go/packages` sees it when loading. Use this when you
+know exactly which tag you want:
+
+```bash
+cairnlint -tags=integration ./test/integration/...
+```
+
+`-tags=auto` scans every `.go` file under the
+target patterns, extracts user-defined build tags from
+`//go:build` and `// +build` lines, then runs cairnlint
+once per tag plus a default-build pass. Duplicate
+diagnostics across passes collapse; exit code is the
+worst observed. This is what you want in a full lint
+script that should catch every issue regardless of tag:
+
+```bash
+cairnlint -tags=auto ./...
+```
+
+GOOS, GOARCH, compiler pseudo-tags (`cgo`, `race`,
+`msan`, …), and `go1.N` version gates are filtered out
+of auto-discovery since they are not user tags.
+`testdata/`, `vendor/`, `node_modules/`, and hidden
+directories are skipped during the scan.
 
 ## Agent Mode
 
@@ -357,6 +392,7 @@ Tests use `analysistest.Run` with fixture files in
 | `wgaddbeforego` | `wg.Add` before `wg.Go` (double-counts WaitGroup) |
 | `gowggo` | `go wg.Go(...)` wrapping (races Add with Wait) |
 | `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
+| `preferwggo` | Pre-1.25 `wg.Add(1)` + `go func(){defer wg.Done()}()` pattern |
 | `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` |
 | `chandirclose` | `close()` on bidirectional channel param |
 | `poolresetbeforeput` | `sync.Pool.Put` without Reset (SSA) |
