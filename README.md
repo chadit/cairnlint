@@ -202,17 +202,28 @@ The LLM's workflow looks like this:
    --type go --glob '!*_test.go'`)
 5. Report genuine issues, dismiss false positives
 
-### Agent-only analyzers (1)
+### Agent-only analyzers (2)
 
 | Analyzer | What it flags |
 | ---- | ---- |
 | `agentexportedintestfile` | Exported decls in augmented `_test.go` files |
+| `aibuzzwords` | AI-flavored vocabulary, hedging, and clichés in comments |
 
 `agentexportedintestfile` flags exported func, var,
 const, and type declarations in same-package test files
 (package `foo`, not `foo_test`). Skips framework
 functions: TestXxx, BenchmarkXxx, FuzzXxx, ExampleXxx,
 TestMain.
+
+`aibuzzwords` scans comments for vocabulary that the
+writing-style rules forbid: buzzwords (`delve`, `robust`,
+`leverage`), hedging (`generally speaking`, `it is worth
+noting`), formal transitions (`furthermore`, `moreover`),
+clichés (`in today's world`, `at its core`), and preachy
+universals (`we all`, `everyone knows`). Hit rate is high
+in technical prose, so this is agent-only; an LLM can
+dismiss the legitimate uses of words like `critical` or
+`extensive` without bothering a human reviewer.
 
 ### Adding a new agent-only analyzer
 
@@ -328,13 +339,20 @@ pipeline alongside your other linters.
 ## Testing
 
 ```bash
-cd cmd/cairnlint
-go test ./analyzers/ -v
+make test          # go test -race -count=1 ./... (matches CI)
+make test-fast     # same tests without -race for quick local loops
+make help          # list every target
 ```
 
 Tests use `analysistest.Run` with fixture files in
 `analyzers/testdata/src/`. Each fixture contains
 `// want` comments marking expected diagnostics.
+
+Run from the module root. The `testdata/` directories
+hold fixture code that is loaded by `analysistest.Run`,
+not executed; running them directly (e.g. through an
+IDE test explorer) can produce spurious failures since
+they exist purely as syntactic input for the analyzers.
 
 ## Analyzers
 
@@ -413,6 +431,15 @@ Tests use `analysistest.Run` with fixture files in
 | `unattributedtodo` | Unowned TODO/FIXME/HACK/XXX |
 | `testcryptoinprod` | Test crypto packages in production code |
 | `signalhandling` | `main()` with server but no signal handling |
+
+### Documentation style
+
+| Analyzer | What it flags |
+| ---- | ---- |
+| `emdash` | Em dash (U+2014) in comments |
+| `docparamblock` | Javadoc `Parameters:`/`Returns:` blocks in doc comments |
+| `doctutorialvoice` | Tutorial voice (`Lets you`, `Use this to`, `Here we`) |
+| `teststructuredblock` | `Workflow:`/`Purpose:`/etc. in test doc comments |
 
 ## Adding a new analyzer
 

@@ -95,6 +95,15 @@ func Categories() []Category {
 				testCryptoInProdAnalyzer(),
 			},
 		},
+		{
+			Name: "Documentation style",
+			Analyzers: []*analysis.Analyzer{
+				emdashAnalyzer(),
+				docParamBlockAnalyzer(),
+				docTutorialVoiceAnalyzer(),
+				testStructuredBlockAnalyzer(),
+			},
+		},
 	}
 }
 

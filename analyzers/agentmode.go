@@ -71,5 +71,6 @@ func DetectAgentCaller() bool {
 func AgentOnly() []*analysis.Analyzer {
 	return []*analysis.Analyzer{
 		agentExportedInTestFileAnalyzer(),
+		agentAIBuzzwordsAnalyzer(),
 	}
 }
