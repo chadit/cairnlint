@@ -89,7 +89,7 @@ func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass, minRangeLen
 			}
 
 			if rangeBodyAssignsToMap(rangeStmt.Body, mapName) {
-				// Small literal range source — skip but keep scanning for
+				// Small literal range source, skip but keep scanning for
 				// subsequent range loops that may have a larger source.
 				if litLen := rangeSourceLiteralLen(rangeStmt.X); litLen >= 0 && litLen < minRangeLen {
 					continue

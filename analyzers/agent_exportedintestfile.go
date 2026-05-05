@@ -36,7 +36,7 @@ func runAgentExportedInTestFile(pass *analysis.Pass) (any, error) {
 		}
 
 		// Only flag augmented test files (package foo, not package foo_test).
-		// External test packages are fine — their exports are test-internal.
+		// External test packages are fine, their exports are test-internal.
 		if strings.HasSuffix(pkgName, "_test") {
 			continue
 		}
@@ -73,7 +73,7 @@ func checkExportedFunc(pass *analysis.Pass, funcDecl *ast.FuncDecl) {
 	}
 
 	pass.Reportf(funcDecl.Name.Pos(),
-		"[agent] exported %s %s in augmented _test.go file — adds to package API only during compilation; verify this isn't solely for verification access",
+		"[agent] exported %s %s in augmented _test.go file: adds to package API only during compilation; verify this isn't solely for verification access",
 		kind, name)
 }
 
@@ -85,14 +85,14 @@ func checkExportedGenDecl(pass *analysis.Pass, decl *ast.GenDecl) {
 			for _, ident := range typedSpec.Names {
 				if isExportedName(ident.Name) {
 					pass.Reportf(ident.Pos(),
-						"[agent] exported var/const %s in augmented _test.go file — adds to package API only during compilation; verify this isn't solely for verification access",
+						"[agent] exported var/const %s in augmented _test.go file: adds to package API only during compilation; verify this isn't solely for verification access",
 						ident.Name)
 				}
 			}
 		case *ast.TypeSpec:
 			if isExportedName(typedSpec.Name.Name) {
 				pass.Reportf(typedSpec.Name.Pos(),
-					"[agent] exported type %s in augmented _test.go file — adds to package API only during compilation; verify this isn't solely for verification access",
+					"[agent] exported type %s in augmented _test.go file: adds to package API only during compilation; verify this isn't solely for verification access",
 					typedSpec.Name.Name)
 			}
 		}

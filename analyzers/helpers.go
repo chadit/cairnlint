@@ -101,6 +101,18 @@ func isTestFile(pass *analysis.Pass, pos ast.Node) bool {
 	return strings.HasSuffix(pass.Fset.Position(pos.Pos()).Filename, "_test.go")
 }
 
+// isMockPath reports whether filename lives in a directory named `mocks`.
+// Matches common layouts like `test/mocks/`, `tests/mocks/`, `internal/mocks/`,
+// or a repo-root `mocks/` directory. Used to exempt mock infrastructure from
+// rules that don't apply to test doubles.
+func isMockPath(filename string) bool {
+	if strings.Contains(filename, "/mocks/") {
+		return true
+	}
+
+	return strings.HasPrefix(filename, "mocks/")
+}
+
 // hasTestFiles reports whether the pass contains any _test.go files.
 func hasTestFiles(pass *analysis.Pass) bool {
 	for _, file := range pass.Files {

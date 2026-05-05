@@ -26,7 +26,7 @@ func runDiscardedContext(pass *analysis.Pass) (any, error) {
 			continue
 		}
 
-		if strings.Contains(filename, "test/mocks/") {
+		if isMockPath(filename) {
 			continue
 		}
 

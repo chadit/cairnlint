@@ -97,7 +97,7 @@ func runBuilderGrow(pass *analysis.Pass, minRangeLen int) (any, error) {
 		}
 
 		// Builder declared inside the loop body is scoped to a single
-		// iteration — no cross-iteration accumulation, so Grow is pointless.
+		// iteration, so cross-iteration accumulation is impossible and Grow is pointless.
 		if isDeclaredInsideLoop(loopNode, receiver, pass.TypesInfo) {
 			return true
 		}

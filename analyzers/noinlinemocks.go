@@ -8,12 +8,12 @@ import (
 )
 
 // noInlineMocksAnalyzer returns an analyzer that flags `type MockFoo struct`
-// declarations in test files outside test/mocks/. Mock types should be
-// centralized in test/mocks/ so they're discoverable and reusable.
+// declarations in test files outside a `mocks/` directory. Mock types should
+// be centralized in a `mocks/` package so they're discoverable and reusable.
 func noInlineMocksAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "noinlinemocks",
-		Doc:  "flags mock struct types in test files outside test/mocks/; centralize mocks for reuse",
+		Doc:  "flags mock struct types in test files outside a mocks/ directory; centralize mocks for reuse",
 		Run:  runNoInlineMocks,
 	}
 }
@@ -26,7 +26,7 @@ func runNoInlineMocks(pass *analysis.Pass) (any, error) {
 			continue
 		}
 
-		if strings.Contains(filename, "test/mocks/") {
+		if isMockPath(filename) {
 			continue
 		}
 
@@ -52,7 +52,7 @@ func checkFileForInlineMocks(pass *analysis.Pass, file *ast.File) {
 
 		name := typeSpec.Name.Name
 		if strings.HasPrefix(name, "Mock") || strings.HasPrefix(name, "mock") {
-			pass.Reportf(typeSpec.Name.Pos(), "mock type %s must be in test/mocks/, not inline in test files", name)
+			pass.Reportf(typeSpec.Name.Pos(), "mock type %s must be in a mocks/ directory, not inline in test files", name)
 		}
 
 		return true
