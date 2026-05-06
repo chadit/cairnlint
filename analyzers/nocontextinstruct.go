@@ -58,5 +58,5 @@ func isContextType(expr ast.Expr) bool {
 
 	ident, isIdent := sel.X.(*ast.Ident)
 
-	return isIdent && ident.Name == "context"
+	return isIdent && ident.Name == contextPkgPath
 }

@@ -47,7 +47,7 @@ func runNoDefaultHTTPClient(pass *analysis.Pass) (any, error) {
 		}
 
 		pkg := obj.Pkg()
-		if pkg == nil || pkg.Path() != "net/http" {
+		if pkg == nil || pkg.Path() != httpPkgPath {
 			return
 		}
 

@@ -81,7 +81,7 @@ func isHTTPClientType(pass *analysis.Pass, lit *ast.CompositeLit) bool {
 
 	obj := named.Obj()
 
-	return obj.Name() == "Client" && obj.Pkg() != nil && obj.Pkg().Path() == "net/http"
+	return obj.Name() == "Client" && obj.Pkg() != nil && obj.Pkg().Path() == httpPkgPath
 }
 
 // hasTimeoutField reports whether lit contains a KeyValueExpr with key

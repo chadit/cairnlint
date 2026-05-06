@@ -10,6 +10,6 @@ func contextBackgroundAnalyzer() *analysis.Analyzer {
 		name:     "contextbackground",
 		doc:      "flags context.Background() in test files; use t.Context() instead",
 		message:  "use t.Context() instead of context.Background() in tests",
-		matchers: []callMatcher{{pkgPath: "context", funcName: "Background"}},
+		matchers: []callMatcher{{pkgPath: contextPkgPath, funcName: "Background"}},
 	})
 }

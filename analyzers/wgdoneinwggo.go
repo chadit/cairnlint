@@ -2,6 +2,7 @@ package analyzers
 
 import (
 	"go/ast"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -72,7 +73,7 @@ func runWGDoneInWGGo(pass *analysis.Pass) (any, error) {
 // that is passed as an argument to wg.Go() on the same receiver as the Done
 // call. Returns true when the Done is nested inside such a closure.
 func isInsideWGGoClosure(stack []ast.Node, doneReceiver string, pass *analysis.Pass) bool {
-	for idx := len(stack) - 1; idx >= 0; idx-- {
+	for idx := range slices.Backward(stack) {
 		funcLit, isFuncLit := stack[idx].(*ast.FuncLit)
 		if !isFuncLit {
 			continue
@@ -88,7 +89,7 @@ func isInsideWGGoClosure(stack []ast.Node, doneReceiver string, pass *analysis.P
 		}
 
 		parentSel, isSel := parentCall.Fun.(*ast.SelectorExpr)
-		if !isSel || parentSel.Sel.Name != "Go" {
+		if !isSel || parentSel.Sel.Name != goMethodName {
 			continue
 		}
 

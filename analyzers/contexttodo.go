@@ -10,6 +10,6 @@ func contextTODOAnalyzer() *analysis.Analyzer {
 		name:     "contexttodo",
 		doc:      "flags context.TODO() in test files; use t.Context() instead",
 		message:  "use t.Context() instead of context.TODO() in tests",
-		matchers: []callMatcher{{pkgPath: "context", funcName: "TODO"}},
+		matchers: []callMatcher{{pkgPath: contextPkgPath, funcName: "TODO"}},
 	})
 }

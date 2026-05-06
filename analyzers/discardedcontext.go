@@ -78,5 +78,5 @@ func isContextContextType(expr ast.Expr) bool {
 		return false
 	}
 
-	return ident.Name == "context" && sel.Sel.Name == "Context"
+	return ident.Name == contextPkgPath && sel.Sel.Name == "Context"
 }

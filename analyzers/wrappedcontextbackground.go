@@ -23,9 +23,9 @@ func wrappedContextBackgroundAnalyzer() *analysis.Analyzer {
 
 func runWrappedContextBackground(pass *analysis.Pass) (any, error) {
 	wrapperFuncs := []callMatcher{
-		{pkgPath: "context", funcName: "WithCancel"},
-		{pkgPath: "context", funcName: "WithTimeout"},
-		{pkgPath: "context", funcName: "WithDeadline"},
+		{pkgPath: contextPkgPath, funcName: "WithCancel"},
+		{pkgPath: contextPkgPath, funcName: "WithTimeout"},
+		{pkgPath: contextPkgPath, funcName: "WithDeadline"},
 	}
 
 	if !hasTestFiles(pass) {
@@ -87,5 +87,5 @@ func hasBackgroundArg(call *ast.CallExpr, pass *analysis.Pass) bool {
 		return false
 	}
 
-	return isCallTo(argCall, pass.TypesInfo, "context", "Background")
+	return isCallTo(argCall, pass.TypesInfo, contextPkgPath, "Background")
 }

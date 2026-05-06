@@ -7,6 +7,12 @@ import (
 	cairnlint "github.com/chadit/cairnlint"
 )
 
+const (
+	testIntegrationTag  = "integration"
+	testWildcardPattern = "./..."
+	testBinaryName      = "cairnlint"
+)
+
 // TestConsumeTagsFlag exercises every supported form for passing build
 // tags (=value and space-separated, single and double dash) and confirms
 // the flag is stripped from os.Args so multichecker does not see it.
@@ -21,45 +27,45 @@ func TestConsumeTagsFlag(t *testing.T) {
 	}{
 		{
 			name:     "double dash equals",
-			argv:     []string{"cairnlint", "--tags=integration", "./..."},
-			wantTags: "integration",
-			wantArgv: []string{"cairnlint", "./..."},
+			argv:     []string{testBinaryName, "--tags=" + testIntegrationTag, testWildcardPattern},
+			wantTags: testIntegrationTag,
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "single dash equals",
-			argv:     []string{"cairnlint", "-tags=integration,e2e", "./..."},
+			argv:     []string{testBinaryName, "-tags=integration,e2e", testWildcardPattern},
 			wantTags: "integration,e2e",
-			wantArgv: []string{"cairnlint", "./..."},
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "double dash space separated",
-			argv:     []string{"cairnlint", "--tags", "integration", "./..."},
-			wantTags: "integration",
-			wantArgv: []string{"cairnlint", "./..."},
+			argv:     []string{testBinaryName, "--tags", testIntegrationTag, testWildcardPattern},
+			wantTags: testIntegrationTag,
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "single dash space separated",
-			argv:     []string{"cairnlint", "-tags", "integration", "./..."},
-			wantTags: "integration",
-			wantArgv: []string{"cairnlint", "./..."},
+			argv:     []string{testBinaryName, "-tags", testIntegrationTag, testWildcardPattern},
+			wantTags: testIntegrationTag,
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "no tags flag",
-			argv:     []string{"cairnlint", "./..."},
+			argv:     []string{testBinaryName, testWildcardPattern},
 			wantTags: "",
-			wantArgv: []string{"cairnlint", "./..."},
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "last value wins when duplicated",
-			argv:     []string{"cairnlint", "-tags=first", "-tags=second", "./..."},
+			argv:     []string{testBinaryName, "-tags=first", "-tags=second", testWildcardPattern},
 			wantTags: "second",
-			wantArgv: []string{"cairnlint", "./..."},
+			wantArgv: []string{testBinaryName, testWildcardPattern},
 		},
 		{
 			name:     "space form at end without value is dropped",
-			argv:     []string{"cairnlint", "-tags"},
+			argv:     []string{testBinaryName, "-tags"},
 			wantTags: "",
-			wantArgv: []string{"cairnlint"},
+			wantArgv: []string{testBinaryName},
 		},
 	}
 
@@ -99,14 +105,14 @@ func TestPropagateBuildTagsPrepends(t *testing.T) {
 		{
 			name:        "empty initial",
 			initial:     "",
-			tags:        "integration",
-			wantGOFLAGS: "-tags=integration",
+			tags:        testIntegrationTag,
+			wantGOFLAGS: "-tags=" + testIntegrationTag,
 		},
 		{
 			name:        "preserves existing GOFLAGS",
 			initial:     "-mod=vendor",
-			tags:        "integration",
-			wantGOFLAGS: "-tags=integration -mod=vendor",
+			tags:        testIntegrationTag,
+			wantGOFLAGS: "-tags=" + testIntegrationTag + " -mod=vendor",
 		},
 	}
 

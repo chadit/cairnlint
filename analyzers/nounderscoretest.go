@@ -68,7 +68,7 @@ func runNoUnderscoreTestNames(pass *analysis.Pass) (any, error) {
 // isTestFuncName reports whether name starts with a recognized test prefix
 // followed by an uppercase letter (matching the testing package convention).
 func isTestFuncName(name string) bool {
-	prefixes := []string{"Test", "Benchmark", "Fuzz"}
+	prefixes := []string{testPrefix, benchmarkPrefix, fuzzPrefix}
 
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(name, prefix) && len(name) > len(prefix) {
@@ -83,7 +83,7 @@ func isTestFuncName(name string) bool {
 
 // stripTestPrefix removes the Test/Benchmark/Fuzz prefix from name.
 func stripTestPrefix(name string) string {
-	prefixes := []string{"Benchmark", "Fuzz", "Test"}
+	prefixes := []string{benchmarkPrefix, fuzzPrefix, testPrefix}
 
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(name, prefix) {

@@ -3,6 +3,8 @@ package analyzers
 import (
 	"go/ast"
 	"go/types"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -13,6 +15,24 @@ import (
 // testingPkgPath is the import path for the standard testing package,
 // extracted as a constant to satisfy goconst across benchmark analyzers.
 const testingPkgPath = "testing"
+
+// Shared package paths used across multiple analyzers.
+const (
+	contextPkgPath = "context"
+	httpPkgPath    = "net/http"
+	stringsPkgPath = "strings"
+	syncPkgPath    = "sync"
+	reflectPkgPath = "reflect"
+)
+
+// Shared method and function names used across multiple analyzers.
+const (
+	benchmarkPrefix = "Benchmark"
+	goMethodName    = "Go"
+	fuzzPrefix      = "Fuzz"
+	testPrefix      = "Test"
+	containsFunc    = "Contains"
+)
 
 // callMatcher describes a function call to flag in test files.
 type callMatcher struct {
@@ -102,15 +122,13 @@ func isTestFile(pass *analysis.Pass, pos ast.Node) bool {
 }
 
 // isMockPath reports whether filename lives in a directory named `mocks`.
-// Matches common layouts like `test/mocks/`, `tests/mocks/`, `internal/mocks/`,
+// Matches any layout like `test/mocks/`, `tests/mocks/`, `internal/mocks/`,
 // or a repo-root `mocks/` directory. Used to exempt mock infrastructure from
 // rules that don't apply to test doubles.
 func isMockPath(filename string) bool {
-	if strings.Contains(filename, "/mocks/") {
-		return true
-	}
+	dir := filepath.Dir(filename)
 
-	return strings.HasPrefix(filename, "mocks/")
+	return slices.Contains(strings.Split(dir, string(filepath.Separator)), "mocks")
 }
 
 // hasTestFiles reports whether the pass contains any _test.go files.
@@ -145,7 +163,7 @@ func isCallTo(call *ast.CallExpr, info *types.Info, pkgPath, funcName string) bo
 // isInsideSynctestClosure walks the stack looking for a function literal
 // that is an argument to synctest.Test(). Returns true if found.
 func isInsideSynctestClosure(stack []ast.Node, info *types.Info) bool {
-	for idx := len(stack) - 1; idx >= 0; idx-- {
+	for idx := range slices.Backward(stack) {
 		funcLit, isFuncLit := stack[idx].(*ast.FuncLit)
 		if !isFuncLit {
 			continue
@@ -182,11 +200,11 @@ func isFuncLitArg(call *ast.CallExpr, lit *ast.FuncLit) bool {
 // isBenchmarkFunc reports whether funcDecl is a benchmark function: name starts
 // with "Benchmark" and has a single parameter of type *testing.B.
 func isBenchmarkFunc(funcDecl *ast.FuncDecl, info *types.Info) bool {
-	if funcDecl.Name == nil || len(funcDecl.Name.Name) <= len("Benchmark") {
+	if funcDecl.Name == nil || len(funcDecl.Name.Name) <= len(benchmarkPrefix) {
 		return false
 	}
 
-	if funcDecl.Name.Name[:len("Benchmark")] != "Benchmark" {
+	if funcDecl.Name.Name[:len(benchmarkPrefix)] != benchmarkPrefix {
 		return false
 	}
 

@@ -108,7 +108,7 @@ func containsWGGoCall(stmt ast.Stmt, receiver string, info *types.Info) bool {
 		}
 
 		sel, isSel := call.Fun.(*ast.SelectorExpr)
-		if !isSel || sel.Sel.Name != "Go" {
+		if !isSel || sel.Sel.Name != goMethodName {
 			return true
 		}
 
@@ -250,7 +250,7 @@ func isWaitGroupReceiver(expr ast.Expr, info *types.Info) bool {
 
 	obj := named.Obj()
 
-	return obj.Pkg() != nil && obj.Pkg().Path() == "sync" && obj.Name() == "WaitGroup"
+	return obj.Pkg() != nil && obj.Pkg().Path() == syncPkgPath && obj.Name() == "WaitGroup"
 }
 
 // isWaitGroupMethod reports whether the method selected by sel was declared
@@ -284,7 +284,7 @@ func isWaitGroupMethod(sel *ast.SelectorExpr, info *types.Info) bool {
 
 	declObj := named.Obj()
 
-	return declObj.Pkg() != nil && declObj.Pkg().Path() == "sync" && declObj.Name() == "WaitGroup"
+	return declObj.Pkg() != nil && declObj.Pkg().Path() == syncPkgPath && declObj.Name() == "WaitGroup"
 }
 
 // receiverIdent extracts a string representation of the receiver expression

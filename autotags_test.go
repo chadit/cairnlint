@@ -10,6 +10,11 @@ import (
 	cairnlint "github.com/chadit/cairnlint"
 )
 
+const (
+	integrationTag  = "integration"
+	wildcardPattern = "./..."
+)
+
 // TestDiscoverBuildTagsReturnsUserTags writes a minimal tree of .go files
 // with a mix of user-defined tags, GOOS/GOARCH values, pseudo-tags, and
 // negations, then confirms only the user-defined tags survive filtering.
@@ -36,7 +41,7 @@ func TestDiscoverBuildTagsReturnsUserTags(t *testing.T) {
 		t.Fatalf("DiscoverBuildTags: %v", err)
 	}
 
-	want := []string{"custom", "e2e", "integration", "slow"}
+	want := []string{"custom", "e2e", integrationTag, "slow"}
 
 	sort.Strings(got)
 
@@ -130,7 +135,7 @@ func TestRunAutoTagsPassesMergesOutput(t *testing.T) {
 
 	// echo will ignore any -tags=<value> prefix and print the rest.
 	// Pass a fixed pattern arg so the discovery walk finds our fixtures.
-	code := cairnlint.RunAutoTagsPasses(t.Context(), &stdout, &stderr, "/bin/echo", []string{"./..."})
+	code := cairnlint.RunAutoTagsPasses(t.Context(), &stdout, &stderr, "/bin/echo", []string{wildcardPattern})
 	if code != 0 {
 		t.Errorf("exit code: got %d, want 0", code)
 	}
@@ -138,7 +143,7 @@ func TestRunAutoTagsPassesMergesOutput(t *testing.T) {
 	// Each pass prints one echo line. Tags should appear when present.
 	stdoutText := stdout.String()
 
-	if !bytes.Contains(stdout.Bytes(), []byte("./...")) {
+	if !bytes.Contains(stdout.Bytes(), []byte(wildcardPattern)) {
 		t.Errorf("stdout missing pattern echo: %q", stdoutText)
 	}
 

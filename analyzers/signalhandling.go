@@ -60,7 +60,7 @@ func runSignalHandling(pass *analysis.Pass) (any, error) {
 			}
 
 			// Check package-level function calls: http.ListenAndServe, net.Listen
-			if isCallTo(call, pass.TypesInfo, "net/http", "ListenAndServe") ||
+			if isCallTo(call, pass.TypesInfo, httpPkgPath, "ListenAndServe") ||
 				isCallTo(call, pass.TypesInfo, "net", "Listen") {
 				hasServer = true
 			}

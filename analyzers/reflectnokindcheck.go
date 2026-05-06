@@ -3,6 +3,7 @@ package analyzers
 import (
 	"go/ast"
 	"go/types"
+	"slices"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -88,14 +89,14 @@ func isReflectMethod(sel *ast.SelectorExpr, info *types.Info) bool {
 
 	pkg := obj.Pkg()
 
-	return pkg != nil && pkg.Path() == "reflect"
+	return pkg != nil && pkg.Path() == reflectPkgPath
 }
 
 // isKindGuarded walks the AST stack backwards from the call site looking for
 // an enclosing if-statement or switch-statement that checks .Kind() on the
 // same receiver. Stops at function boundaries.
 func isKindGuarded(stack []ast.Node, receiver string) bool {
-	for idx := len(stack) - 1; idx >= 0; idx-- {
+	for idx := range slices.Backward(stack) {
 		switch node := stack[idx].(type) {
 		case *ast.FuncDecl, *ast.FuncLit:
 			// Reached a function boundary without finding a guard.

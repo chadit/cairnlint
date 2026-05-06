@@ -41,7 +41,7 @@ func runGoWGGo(pass *analysis.Pass) (any, error) {
 		// which naturally does not match a SelectorExpr. Only direct
 		// `go wg.Go(...)` triggers a match.
 		sel, isSel := goStmt.Call.Fun.(*ast.SelectorExpr)
-		if !isSel || sel.Sel.Name != "Go" {
+		if !isSel || sel.Sel.Name != goMethodName {
 			return
 		}
 

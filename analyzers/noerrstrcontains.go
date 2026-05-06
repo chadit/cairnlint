@@ -51,10 +51,10 @@ func runNoErrStrContains(pass *analysis.Pass) (any, error) {
 //   - require.Contains(t, err.Error(), ...)
 func hasErrDotErrorArg(call *ast.CallExpr, pass *analysis.Pass) bool {
 	containsMatchers := []callMatcher{
-		{pkgPath: "strings", funcName: "Contains"},
-		{pkgPath: "github.com/stretchr/testify/assert", funcName: "Contains"},
-		{pkgPath: "github.com/stretchr/testify/require", funcName: "Contains"},
-		{pkgPath: "github.com/stretchr/testify/suite", funcName: "Contains"},
+		{pkgPath: stringsPkgPath, funcName: containsFunc},
+		{pkgPath: "github.com/stretchr/testify/assert", funcName: containsFunc},
+		{pkgPath: "github.com/stretchr/testify/require", funcName: containsFunc},
+		{pkgPath: "github.com/stretchr/testify/suite", funcName: containsFunc},
 	}
 
 	if !matchesAny(call, pass.TypesInfo, containsMatchers) {
@@ -71,7 +71,7 @@ func hasErrDotErrorArg(call *ast.CallExpr, pass *analysis.Pass) bool {
 // errDotErrorArgIndex returns the argument index that should contain the
 // haystack string for the matched function.
 func errDotErrorArgIndex(call *ast.CallExpr, pass *analysis.Pass) int {
-	if isCallTo(call, pass.TypesInfo, "strings", "Contains") {
+	if isCallTo(call, pass.TypesInfo, stringsPkgPath, "Contains") {
 		return 0
 	}
 

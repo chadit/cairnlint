@@ -141,7 +141,7 @@ func isBuilderReceiver(expr ast.Expr, info *types.Info) bool {
 
 	obj := named.Obj()
 
-	return obj.Pkg() != nil && obj.Pkg().Path() == "strings" && obj.Name() == "Builder"
+	return obj.Pkg() != nil && obj.Pkg().Path() == stringsPkgPath && obj.Name() == "Builder"
 }
 
 // enclosingLoop walks the inspector stack backwards and returns the nearest
@@ -334,7 +334,7 @@ func isBuilderType(t types.Type) bool {
 
 	obj := named.Obj()
 
-	return obj.Pkg() != nil && obj.Pkg().Path() == "strings" && obj.Name() == "Builder"
+	return obj.Pkg() != nil && obj.Pkg().Path() == stringsPkgPath && obj.Name() == "Builder"
 }
 
 // stmtHasGrowCall reports whether stmt contains a call to Grow() on a

@@ -10,7 +10,6 @@ import (
 
 // syncPkgPath is the import path for the sync package, extracted as a constant
 // to satisfy goconst across analyzers that check sync types.
-const syncPkgPath = "sync"
 
 // poolPutMinArgs is the minimum number of arguments for a (*sync.Pool).Put
 // call in SSA form: arg[0] is the pool receiver, arg[1] is the object.
