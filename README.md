@@ -216,14 +216,25 @@ functions: TestXxx, BenchmarkXxx, FuzzXxx, ExampleXxx,
 TestMain.
 
 `aibuzzwords` scans comments for vocabulary that the
-writing-style rules forbid: buzzwords (`delve`, `robust`,
-`leverage`), hedging (`generally speaking`, `it is worth
-noting`), formal transitions (`furthermore`, `moreover`),
-clichés (`in today's world`, `at its core`), and preachy
-universals (`we all`, `everyone knows`). Hit rate is high
-in technical prose, so this is agent-only; an LLM can
-dismiss the legitimate uses of words like `critical` or
-`extensive` without bothering a human reviewer.
+writing-style rules forbid across five categories:
+buzzwords, hedging phrases, formal transitions, clichéd
+openers, and preachy universal statements.
+
+Example words from each category (kept in a code fence so
+the lint scanner skips them when reading this file):
+
+```text
+buzzwords:           delve, robust, leverage
+hedging:             generally speaking, it is worth noting
+formal transitions:  furthermore, moreover
+clichés:             in today's world, at its core
+preachy universals:  we all, everyone knows
+```
+
+Hit rate is high in technical prose, so this analyzer is
+agent-only. An LLM can dismiss legitimate uses of common
+words like the ones above without bothering a human
+reviewer.
 
 ### Adding a new agent-only analyzer
 
@@ -411,6 +422,7 @@ they exist purely as syntactic input for the analyzers.
 | `gowggo` | `go wg.Go(...)` wrapping (races Add with Wait) |
 | `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
 | `preferwggo` | Pre-1.25 `wg.Add(1)` + `go func(){defer wg.Done()}()` pattern |
+| `preferwggofanout` | `wg.Add(N)` + N-goroutine loop with `defer wg.Done()` |
 | `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` |
 | `chandirclose` | `close()` on bidirectional channel param |
 | `poolresetbeforeput` | `sync.Pool.Put` without Reset (SSA) |

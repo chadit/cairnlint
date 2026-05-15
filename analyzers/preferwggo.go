@@ -73,7 +73,7 @@ func checkBlockForPreferWGGo(stmts []ast.Stmt, pass *analysis.Pass) {
 // untyped literal 1 because wg.Go always increments the counter by exactly
 // one; other values would silently change semantics if blindly migrated.
 func extractWGAddOneCall(stmt ast.Stmt, info *types.Info) (*ast.CallExpr, string) {
-	call, recv := extractWGMethodCall(stmt, info, "Add")
+	call, recv := extractWGAddCall(stmt, info)
 	if call == nil {
 		return nil, ""
 	}

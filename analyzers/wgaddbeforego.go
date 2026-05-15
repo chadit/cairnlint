@@ -50,7 +50,7 @@ func runWGAddBeforeGo(pass *analysis.Pass) (any, error) {
 // harmless statements but stops at control flow that could consume the Add.
 func checkBlockForAddBeforeGo(stmts []ast.Stmt, pass *analysis.Pass) {
 	for idx, stmt := range stmts {
-		addCall, addReceiver := extractWGMethodCall(stmt, pass.TypesInfo, "Add")
+		addCall, addReceiver := extractWGAddCall(stmt, pass.TypesInfo)
 		if addReceiver == "" {
 			continue
 		}
@@ -69,7 +69,7 @@ func checkBlockForAddBeforeGo(stmts []ast.Stmt, pass *analysis.Pass) {
 			}
 
 			// Another wg.Add on the same receiver shadows this one.
-			_, anotherAddRecv := extractWGMethodCall(nextStmt, pass.TypesInfo, "Add")
+			_, anotherAddRecv := extractWGAddCall(nextStmt, pass.TypesInfo)
 			if anotherAddRecv == addReceiver {
 				break
 			}
@@ -198,11 +198,11 @@ func stmtStartsGoroutineOrDefer(stmt ast.Stmt) bool {
 	return found
 }
 
-// extractWGMethodCall checks whether stmt is an expression statement calling
-// methodName on a *sync.WaitGroup receiver. Returns the call expression and
-// the receiver identifier name, or (nil, "") if no match. Also detects
-// promoted methods from embedded WaitGroups.
-func extractWGMethodCall(stmt ast.Stmt, info *types.Info, methodName string) (*ast.CallExpr, string) {
+// extractWGAddCall checks whether stmt is an expression statement calling
+// Add on a *sync.WaitGroup receiver. Returns the call expression and the
+// receiver identifier name, or (nil, "") if no match. Also detects promoted
+// Add methods from embedded WaitGroups.
+func extractWGAddCall(stmt ast.Stmt, info *types.Info) (*ast.CallExpr, string) {
 	exprStmt, isExpr := stmt.(*ast.ExprStmt)
 	if !isExpr {
 		return nil, ""
@@ -214,7 +214,7 @@ func extractWGMethodCall(stmt ast.Stmt, info *types.Info, methodName string) (*a
 	}
 
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
-	if !isSel || sel.Sel.Name != methodName {
+	if !isSel || sel.Sel.Name != "Add" {
 		return nil, ""
 	}
 
