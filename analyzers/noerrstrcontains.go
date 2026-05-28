@@ -90,5 +90,5 @@ func isErrDotError(expr ast.Expr) bool {
 
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
 
-	return isSel && sel.Sel.Name == "Error"
+	return isSel && sel.Sel.Name == errorName
 }

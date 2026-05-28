@@ -143,8 +143,15 @@ func collectDirectives(fset *token.FileSet, file *ast.File) []directive {
 // and building the comment map is cached per file, so this function is
 // cheap to call from each wrapped analyzer.
 func buildNolintMap(pass *analysis.Pass, analyzerName string) map[int]bool {
-	result := make(map[int]bool) //nolint:mapprealloc // size depends on nolint comment density, not file count
+	result := make(map[int]bool)
+	fillNolintMap(result, pass, analyzerName)
 
+	return result
+}
+
+// fillNolintMap records into result every line suppressed by a //nolint
+// directive matching analyzerName.
+func fillNolintMap(result map[int]bool, pass *analysis.Pass, analyzerName string) {
 	for _, file := range pass.Files {
 		for _, d := range directivesFor(pass.Fset, file) {
 			if !namesApply(d.names, analyzerName) {
@@ -156,8 +163,6 @@ func buildNolintMap(pass *analysis.Pass, analyzerName string) map[int]bool {
 			}
 		}
 	}
-
-	return result
 }
 
 // parseDirective extracts the raw name list from a //nolint comment, or

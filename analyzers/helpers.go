@@ -32,6 +32,8 @@ const (
 	fuzzPrefix      = "Fuzz"
 	testPrefix      = "Test"
 	containsFunc    = "Contains"
+	errorName       = "Error"
+	isFunc          = "Is"
 )
 
 // callMatcher describes a function call to flag in test files.

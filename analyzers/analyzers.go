@@ -94,6 +94,8 @@ func Categories() []Category {
 				noInlineMocksAnalyzer(),
 				unattributedTODOAnalyzer(),
 				testCryptoInProdAnalyzer(),
+				redundantErrNilCheckAnalyzer(),
+				preferFatalErrGateAnalyzer(),
 			},
 		},
 		{
