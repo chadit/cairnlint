@@ -25,6 +25,9 @@ const (
 	reflectPkgPath = "reflect"
 )
 
+// mainPkgName is the package name of an executable's entry package.
+const mainPkgName = "main"
+
 // Shared method and function names used across multiple analyzers.
 const (
 	benchmarkPrefix = "Benchmark"
@@ -197,6 +200,83 @@ func isFuncLitArg(call *ast.CallExpr, lit *ast.FuncLit) bool {
 	}
 
 	return false
+}
+
+// testingParam reports whether field is a parameter of pointer type to
+// testing.T, testing.B, or testing.F, returning the parameter's variable name
+// when it has exactly one. The name is empty for unnamed parameters.
+func testingParam(info *types.Info, field *ast.Field) (string, bool) {
+	paramType := info.TypeOf(field.Type)
+	if paramType == nil {
+		return "", false
+	}
+
+	ptr, isPtr := paramType.(*types.Pointer)
+	if !isPtr {
+		return "", false
+	}
+
+	named, isNamed := ptr.Elem().(*types.Named)
+	if !isNamed {
+		return "", false
+	}
+
+	obj := named.Obj()
+	if obj.Pkg() == nil || obj.Pkg().Path() != testingPkgPath {
+		return "", false
+	}
+
+	switch obj.Name() {
+	case "T", "B", "F":
+	default:
+		return "", false
+	}
+
+	var name string
+	if len(field.Names) == 1 {
+		name = field.Names[0].Name
+	}
+
+	return name, true
+}
+
+// receiverInfo extracts the type name, receiver variable name, and pointer-ness
+// from a method receiver field. The final result is false when the receiver
+// type is not a plain (possibly generic) named type.
+func receiverInfo(field *ast.Field) (string, string, bool, bool) {
+	expr := field.Type
+
+	var isPtr bool
+	if star, isStar := expr.(*ast.StarExpr); isStar {
+		isPtr = true
+		expr = star.X
+	}
+
+	var typeName string
+
+	switch base := expr.(type) {
+	case *ast.Ident:
+		typeName = base.Name
+	case *ast.IndexExpr:
+		if id, isID := base.X.(*ast.Ident); isID {
+			typeName = id.Name
+		}
+	case *ast.IndexListExpr:
+		if id, isID := base.X.(*ast.Ident); isID {
+			typeName = id.Name
+		}
+	}
+
+	if typeName == "" {
+		return "", "", false, false
+	}
+
+	var recvName string
+	if len(field.Names) > 0 {
+		recvName = field.Names[0].Name
+	}
+
+	return typeName, recvName, isPtr, true
 }
 
 // isBenchmarkFunc reports whether funcDecl is a benchmark function: name starts

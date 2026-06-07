@@ -55,6 +55,8 @@ func Categories() []Category {
 				benchReportAllocsAnalyzer(),
 				benchResetTimerAnalyzer(),
 				builderGrowAnalyzer(),
+				preferAnyAnalyzer(),
+				preferColonEqualsAnalyzer(),
 			},
 		},
 		{
@@ -96,6 +98,20 @@ func Categories() []Category {
 				testCryptoInProdAnalyzer(),
 				redundantErrNilCheckAnalyzer(),
 				preferFatalErrGateAnalyzer(),
+				noDotImportAnalyzer(),
+				contextFirstParamAnalyzer(),
+				testHelperMarkerAnalyzer(),
+			},
+		},
+		{
+			Name: "Naming",
+			Analyzers: []*analysis.Analyzer{
+				selfReceiverAnalyzer(),
+				genericPackageNameAnalyzer(),
+				noGetterPrefixAnalyzer(),
+				mixedReceiverAnalyzer(),
+				consistentReceiverNameAnalyzer(),
+				constMixedCapsAnalyzer(),
 			},
 		},
 		{

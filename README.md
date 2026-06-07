@@ -403,6 +403,8 @@ they exist purely as syntactic input for the analyzers.
 | `typeassertnocheck` | `x := y.(Type)` without comma-ok |
 | `notestifysuites` | `suite.Suite` embedding |
 | `prefervarzero` | `s := ""` (use `var s string`) |
+| `prefercolonequals` | `var x = v` non-zero init (use `x := v`) |
+| `preferany` | `interface{}` (use `any`) |
 | `reflectnokindcheck` | `reflect.Type.Fields()`/`NumField()` without Kind |
 | `bufferpeekstore` | `Peek()` result used after buffer mutation (SSA) |
 | `reflectinloop` | `reflect.ValueOf`/`TypeOf` inside loops |
@@ -443,6 +445,20 @@ they exist purely as syntactic input for the analyzers.
 | `unattributedtodo` | Unowned TODO/FIXME/HACK/XXX |
 | `testcryptoinprod` | Test crypto packages in production code |
 | `signalhandling` | `main()` with server but no signal handling |
+| `nodotimport` | Dot imports (`import . "pkg"`) |
+| `contextfirstparam` | `context.Context` not the first parameter |
+| `testhelper` | Test helper taking `*testing.T` without `t.Helper()` |
+
+### Naming
+
+| Analyzer | What it flags |
+| ---- | ---- |
+| `selfreceiver` | Receivers named `this`/`self`/`me` |
+| `genericpackagename` | Vague package names (`util`, `common`, `helper`) |
+| `nogetterprefix` | `Get`/`get` prefix on zero-arg accessors |
+| `mixedreceiver` | A type mixing value and pointer receivers |
+| `consistentreceivername` | Differing receiver names across a type |
+| `constmixedcaps` | Const names with `_` or `k`-prefix |
 
 ### Documentation style
 
