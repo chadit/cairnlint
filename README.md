@@ -392,7 +392,7 @@ they exist purely as syntactic input for the analyzers.
 
 | Analyzer | What it flags |
 | ---- | ---- |
-| `nounderscoretest` | `TestFoo_Bar` naming |
+| `testunderscoreprefix` | `Test_Foo` naming (empty subject before `_`) |
 | `noruntimenumgoroutine` | `runtime.NumGoroutine()` in tests |
 | `nogenericerror` | `errors.New("error")` vague messages |
 | `noerrstrcontains` | `Contains(err.Error(), ...)` |

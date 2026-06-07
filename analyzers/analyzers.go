@@ -37,7 +37,7 @@ func Categories() []Category {
 			Name: "Expression-level",
 			Analyzers: []*analysis.Analyzer{
 				mapPreallocAnalyzer(),
-				noUnderscoreTestNamesAnalyzer(),
+				testUnderscorePrefixAnalyzer(),
 				noRuntimeNumGoroutineAnalyzer(),
 				noGenericErrorAnalyzer(),
 				noErrStrContainsAnalyzer(),
