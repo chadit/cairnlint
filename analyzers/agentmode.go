@@ -72,5 +72,6 @@ func AgentOnly() []*analysis.Analyzer {
 	return []*analysis.Analyzer{
 		agentExportedInTestFileAnalyzer(),
 		agentAIBuzzwordsAnalyzer(),
+		agentStubBodyAnalyzer(),
 	}
 }

@@ -202,12 +202,13 @@ The LLM's workflow looks like this:
    --type go --glob '!*_test.go'`)
 5. Report genuine issues, dismiss false positives
 
-### Agent-only analyzers (2)
+### Agent-only analyzers (3)
 
 | Analyzer | What it flags |
 | ---- | ---- |
 | `agentexportedintestfile` | Exported decls in augmented `_test.go` files |
 | `aibuzzwords` | AI-flavored vocabulary, hedging, and clichés in comments |
+| `agentstubbody` | Functions whose body does nothing their name or doc claims |
 
 `agentexportedintestfile` flags exported func, var,
 const, and type declarations in same-package test files
@@ -235,6 +236,15 @@ Hit rate is high in technical prose, so this analyzer is
 agent-only. An LLM can dismiss legitimate uses of common
 words like the ones above without bothering a human
 reviewer.
+
+`agentstubbody` flags functions whose body does nothing
+its name or doc claims: an empty body under a descriptive
+doc, a lone return of a canned value (nil, a literal, or
+a canned error), or a "not implemented" sentinel. These
+compile and pass the standard linters, so only a reader
+catches the gap. A no-param, no-doc no-op (interface
+satisfier, null object) is left alone; the rest is for an
+LLM to confirm or dismiss.
 
 ### Adding a new agent-only analyzer
 
