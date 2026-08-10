@@ -9,11 +9,17 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+// agentFileWriter buffers agent-tier diagnostics to a temp file so they stay
+// out of the stdout stream humans and CI read.
+//
+// The pointer-bearing fields lead so the garbage collector stops scanning
+// after the string header, which is the ordering govet's fieldalignment check
+// wants. The mutex still guards every field below it.
 type agentFileWriter struct {
+	file        *os.File
+	path        string
 	mu          sync.Mutex
 	summaryOnce sync.Once
-	path        string
-	file        *os.File
 }
 
 func newAgentFileWriter() *agentFileWriter {

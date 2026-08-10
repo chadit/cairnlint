@@ -1,2 +1,10 @@
 # Compiled binary
 cairnlint
+
+# The global gitignore excludes /.github/ and .golangci.yml, which silently
+# dropped this repo's dependabot.yml, its auto-merge workflow, and its lint
+# config: they existed on disk, were never committed, and so never reached
+# GitHub. CI was running golangci-lint with stock defaults as a result.
+# Re-including them here keeps the toolchain config under version control.
+!/.github/
+!.golangci.yml

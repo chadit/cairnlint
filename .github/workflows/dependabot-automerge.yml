@@ -1,0 +1,25 @@
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+    # The repository guard stops the job running in forks, where the token
+    # cannot merge anything and the run only produces noise.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.repository == 'chadit/cairnlint'
+    steps:
+      # Queues the merge rather than performing it. GitHub holds the pull
+      # request until the required Lint and Test checks pass, so a broken
+      # update stays open instead of landing on main.
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

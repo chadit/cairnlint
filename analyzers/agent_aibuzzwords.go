@@ -16,10 +16,13 @@ import (
 // comments routinely contain ASCII text; the right-hand side is the
 // human-facing category name used in the diagnostic.
 //
+// The pointer field leads so the garbage collector stops scanning after the
+// string header, which is the ordering govet's fieldalignment check wants.
+//
 //nolint:gochecknoglobals // read-only table shared by every pass
 var aiBuzzwordPatterns = []struct {
-	category string
 	pattern  *regexp.Regexp
+	category string
 }{
 	{
 		category: "AI buzzword",
