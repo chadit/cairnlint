@@ -46,8 +46,8 @@ func runTickerLeak(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		isTicker := isCallTo(call, pass.TypesInfo, "time", "NewTicker")
-		isTimer := isCallTo(call, pass.TypesInfo, "time", "NewTimer")
+		isTicker := isCallTo(call, pass.TypesInfo, timePkgPath, "NewTicker")
+		isTimer := isCallTo(call, pass.TypesInfo, timePkgPath, "NewTimer")
 
 		if !isTicker && !isTimer {
 			return true

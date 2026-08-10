@@ -17,6 +17,8 @@ func Categories() []Category {
 			Name: "Scope-dependent (synctest exemption)",
 			Analyzers: []*analysis.Analyzer{
 				synctestSleepAnalyzer(),
+				synctestSleepWaitAnalyzer(),
+				synctestRealServerAnalyzer(),
 				contextBackgroundAnalyzer(),
 				contextTODOAnalyzer(),
 				wrappedContextBackgroundAnalyzer(),
@@ -55,8 +57,9 @@ func Categories() []Category {
 				benchReportAllocsAnalyzer(),
 				benchResetTimerAnalyzer(),
 				builderGrowAnalyzer(),
-				preferAnyAnalyzer(),
 				preferColonEqualsAnalyzer(),
+				preferCutLastAnalyzer(),
+				urlCloneAnalyzer(),
 			},
 		},
 		{
@@ -64,6 +67,7 @@ func Categories() []Category {
 			Analyzers: []*analysis.Analyzer{
 				noDefaultHTTPClientAnalyzer(),
 				httpClientTimeoutAnalyzer(),
+				redundantBodyDrainAnalyzer(),
 			},
 		},
 		{
@@ -72,7 +76,6 @@ func Categories() []Category {
 				wgAddBeforeGoAnalyzer(),
 				goWGGoAnalyzer(),
 				wgDoneInWGGoAnalyzer(),
-				preferWGGoAnalyzer(),
 				preferWGGoFanoutAnalyzer(),
 				tickerLeakAnalyzer(),
 				chanDirectionAnalyzer(),
@@ -101,6 +104,8 @@ func Categories() []Category {
 				noDotImportAnalyzer(),
 				contextFirstParamAnalyzer(),
 				testHelperMarkerAnalyzer(),
+				tlsConfigRandAnalyzer(),
+				goDebugRemovedAnalyzer(),
 			},
 		},
 		{
@@ -123,10 +128,20 @@ func Categories() []Category {
 				testStructuredBlockAnalyzer(),
 			},
 		},
+		{
+			Name:      "Modernizers (golang.org/x/tools, report-only)",
+			Analyzers: modernizeAnalyzers(),
+		},
 	}
 }
 
-// All returns every analyzer registered in cairnlint.
+// All returns every analyzer registered in cairnlint, with suggested fixes
+// stripped.
+//
+// The stripping happens here rather than at the call site because every
+// consumer has a driver that can apply fixes: the multichecker in main has
+// -fix, and golangci-lint has --fix for the module plugin in [plugin]. Doing
+// it once on the way out of this package means a new consumer cannot forget.
 func All() []*analysis.Analyzer {
 	cats := Categories()
 
@@ -140,5 +155,5 @@ func All() []*analysis.Analyzer {
 		out = append(out, cat.Analyzers...)
 	}
 
-	return out
+	return WrapWithoutFixes(out)
 }

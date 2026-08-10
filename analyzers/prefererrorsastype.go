@@ -40,6 +40,10 @@ func runPreferErrorsAsType(pass *analysis.Pass) (any, error) {
 			return
 		}
 
+		if !goVersionAtLeast(pass, call.Pos(), goVersion126) {
+			return
+		}
+
 		pass.Reportf(call.Pos(), "use errors.AsType[T](err) instead of errors.As(err, &target) for type-safe error unwrapping")
 	})
 

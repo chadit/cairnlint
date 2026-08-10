@@ -18,11 +18,18 @@ const testingPkgPath = "testing"
 
 // Shared package paths used across multiple analyzers.
 const (
-	contextPkgPath = "context"
-	httpPkgPath    = "net/http"
-	stringsPkgPath = "strings"
-	syncPkgPath    = "sync"
-	reflectPkgPath = "reflect"
+	bytesPkgPath    = "bytes"
+	contextPkgPath  = "context"
+	httpPkgPath     = "net/http"
+	httptestPkgPath = "net/http/httptest"
+	ioPkgPath       = "io"
+	reflectPkgPath  = "reflect"
+	stringsPkgPath  = "strings"
+	synctestPkgPath = "testing/synctest"
+	syncPkgPath     = "sync"
+	timePkgPath     = "time"
+	tlsPkgPath      = "crypto/tls"
+	urlPkgPath      = "net/url"
 )
 
 // mainPkgName is the package name of an executable's entry package.
@@ -183,12 +190,28 @@ func isInsideSynctestClosure(stack []ast.Node, info *types.Info) bool {
 			continue
 		}
 
-		if isCallTo(parentCall, info, "testing/synctest", "Test") && isFuncLitArg(parentCall, funcLit) {
+		if isCallTo(parentCall, info, synctestPkgPath, "Test") && isFuncLitArg(parentCall, funcLit) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// exprStmtCall returns the call expression when stmt is a bare call whose
+// results are discarded, and nil for any other statement.
+func exprStmtCall(stmt ast.Stmt) *ast.CallExpr {
+	exprStmt, isExpr := stmt.(*ast.ExprStmt)
+	if !isExpr {
+		return nil
+	}
+
+	call, isCall := exprStmt.X.(*ast.CallExpr)
+	if !isCall {
+		return nil
+	}
+
+	return call
 }
 
 // isFuncLitArg reports whether lit appears as an argument in call.

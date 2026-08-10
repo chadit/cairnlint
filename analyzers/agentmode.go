@@ -68,10 +68,12 @@ func DetectAgentCaller() bool {
 //
 // Diagnostic messages from these analyzers are prefixed with [agent] so
 // they're easy to filter and identify in output.
+// Suggested fixes are stripped for the same reason as in [All]: no analyzer
+// leaving this package may carry an edit a driver could apply.
 func AgentOnly() []*analysis.Analyzer {
-	return []*analysis.Analyzer{
+	return WrapWithoutFixes([]*analysis.Analyzer{
 		agentExportedInTestFileAnalyzer(),
 		agentAIBuzzwordsAnalyzer(),
 		agentStubBodyAnalyzer(),
-	}
+	})
 }

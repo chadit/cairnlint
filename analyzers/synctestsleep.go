@@ -11,6 +11,6 @@ func synctestSleepAnalyzer() *analysis.Analyzer {
 		name:     "synctestsleep",
 		doc:      "flags time.Sleep in test files unless inside a synctest.Test closure",
 		message:  "time.Sleep in tests is a flaky test signal; use synctest.Test with synthetic time, channels, or t.Deadline() instead",
-		matchers: []callMatcher{{pkgPath: "time", funcName: "Sleep"}},
+		matchers: []callMatcher{{pkgPath: timePkgPath, funcName: "Sleep"}},
 	})
 }

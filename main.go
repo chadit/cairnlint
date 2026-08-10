@@ -6,12 +6,17 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis/multichecker"
 
 	"github.com/chadit/cairnlint/analyzers"
 )
+
+// exitUsage is the status returned for a rejected command line, kept distinct
+// from the exit code the multichecker uses to signal findings.
+const exitUsage = 2
 
 func main() {
 	if consumeListFlag() {
@@ -55,6 +60,13 @@ func main() {
 		}
 	}
 
+	if flag, rejected := rejectedEditFlag(); rejected {
+		_, _ = fmt.Fprintf(os.Stderr,
+			"cairnlint: %s is not supported; cairnlint reports findings and never edits source\n", flag)
+
+		os.Exit(exitUsage)
+	}
+
 	all := analyzers.All()
 
 	agentMode := consumeAgentFlag() || analyzers.DetectAgentCaller()
@@ -62,7 +74,31 @@ func main() {
 		all = append(all, analyzers.WrapAgentFileOutput(analyzers.AgentOnly())...)
 	}
 
+	// All and AgentOnly already strip suggested fixes, so nothing reaching the
+	// multichecker carries an edit it could apply.
 	multichecker.Main(analyzers.WrapWithNolint(analyzers.WrapSkipGenerated(all))...)
+}
+
+// editFlags are the multichecker driver flags that rewrite source files.
+// The driver registers them for every analysis binary, so cairnlint has to
+// turn them away rather than decline to define them.
+var editFlags = []string{"-fix", "--fix", "-diff", "--diff"} //nolint:gochecknoglobals // package-internal lookup table
+
+// rejectedEditFlag reports the first source-editing flag present in os.Args.
+//
+// WrapWithoutFixes already leaves the driver with nothing to apply, so this
+// check exists to fail loudly rather than accept -fix and quietly change
+// nothing, which would read as "the fixes were already applied".
+func rejectedEditFlag() (string, bool) {
+	for _, arg := range os.Args[1:] {
+		name, _, _ := strings.Cut(arg, "=")
+
+		if slices.Contains(editFlags, name) {
+			return name, true
+		}
+	}
+
+	return "", false
 }
 
 // consumeListFlag removes --list/--linters (and single-dash forms) from

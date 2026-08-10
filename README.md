@@ -375,6 +375,55 @@ not executed; running them directly (e.g. through an
 IDE test explorer) can produce spurious failures since
 they exist purely as syntactic input for the analyzers.
 
+## cairnlint never edits your source
+
+cairnlint reports findings. It has no mode that rewrites
+files, and `-fix` and `-diff` are rejected with exit
+status 2 rather than accepted:
+
+```console
+$ cairnlint -fix ./...
+cairnlint: -fix is not supported; cairnlint reports findings and never edits source
+```
+
+The flag check is the visible half. The guarantee is that
+`All()` and `AgentOnly()` strip the `SuggestedFixes` field
+from every diagnostic before it leaves the package, so no
+driver has anything to apply. That covers the golangci-lint
+module plugin too, which has its own `--fix` and does not
+go through `main`.
+
+This matters because the modernizer analyzers below come
+from `golang.org/x/tools` and ship a fix for nearly every
+diagnostic. Those fixes are stripped like the rest. To
+apply them, run `go fix ./...`, which is the tool designed
+to do it.
+
+## Go version awareness
+
+Analyzers that recommend a standard library API stay quiet
+when the code being checked cannot use it. The language
+version comes from the file's `//go:build go1.N` constraint
+when it has one, and from the `go` directive in `go.mod`
+otherwise.
+
+So `prefererrorsastype` suggests `errors.AsType` only in
+files at `go1.26` or newer, and the Go 1.27 analyzers stay
+silent until a module moves to `go 1.27`. Two files in the
+same package can get different answers if one carries a
+build constraint.
+
+This matters more from Go 1.27 on, because `go test` now
+runs the `stdversion` vet check by default. Acting on a
+suggestion that names a too-new symbol turns a lint hint
+into a vet failure on every later test run.
+
+When the version cannot be determined, the analyzer reports.
+Dropping every version-dependent rule on a package the
+loader could not place would fail far more quietly than the
+occasional suggestion aimed at a version we could not
+confirm.
+
 ## Analyzers
 
 ### Scope-dependent (synctest exemption)
@@ -382,6 +431,8 @@ they exist purely as syntactic input for the analyzers.
 | Analyzer | What it flags |
 | ---- | ---- |
 | `synctestsleep` | `time.Sleep` in tests outside synctest |
+| `synctestsleepwait` | `time.Sleep` then `synctest.Wait` |
+| `synctestrealserver` | `httptest.NewServer` inside a synctest bubble |
 | `contextbackground` | `context.Background()` in tests |
 | `contexttodo` | `context.TODO()` in tests |
 | `wrappedcontextbackground` | `context.With*(ctx.Background())` |
@@ -396,6 +447,7 @@ they exist purely as syntactic input for the analyzers.
 | `preferbloop` | `b.N` loops in benchmarks |
 | `dbquerywithbarebackground` | `db.*Context(ctx.Background())` |
 | `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
+| `redundantbodydrain` | `io.Copy(io.Discard, resp.Body)` before Close |
 | `noelse` | `if-else` blocks (use early returns) |
 
 ### Expression-level
@@ -409,12 +461,13 @@ they exist purely as syntactic input for the analyzers.
 | `nopanicinlib` | `panic()` in non-test files |
 | `nocontextinstruct` | `context.Context` as struct field |
 | `prefererrorsastype` | `errors.As` (use `errors.AsType`) |
-| `preferfmtappendf` | `[]byte(fmt.Sprintf(...))` |
+| `preferfmtappendf` | `[]byte(fmt.Sprintf(...))` (Appendf or Fprintf) |
 | `typeassertnocheck` | `x := y.(Type)` without comma-ok |
 | `notestifysuites` | `suite.Suite` embedding |
 | `prefervarzero` | `s := ""` (use `var s string`) |
 | `prefercolonequals` | `var x = v` non-zero init (use `x := v`) |
-| `preferany` | `interface{}` (use `any`) |
+| `prefercutlast` | `LastIndex` result used as a slice bound |
+| `urlclone` | Shallow copies of `url.Values` and `url.URL` |
 | `reflectnokindcheck` | `reflect.Type.Fields()`/`NumField()` without Kind |
 | `bufferpeekstore` | `Peek()` result used after buffer mutation (SSA) |
 | `reflectinloop` | `reflect.ValueOf`/`TypeOf` inside loops |
@@ -433,7 +486,6 @@ they exist purely as syntactic input for the analyzers.
 | `wgaddbeforego` | `wg.Add` before `wg.Go` (double-counts WaitGroup) |
 | `gowggo` | `go wg.Go(...)` wrapping (races Add with Wait) |
 | `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
-| `preferwggo` | Pre-1.25 `wg.Add(1)` + `go func(){defer wg.Done()}()` pattern |
 | `preferwggofanout` | `wg.Add(N)` + N-goroutine loop with `defer wg.Done()` |
 | `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` |
 | `chandirclose` | `close()` on bidirectional channel param |
@@ -458,6 +510,8 @@ they exist purely as syntactic input for the analyzers.
 | `nodotimport` | Dot imports (`import . "pkg"`) |
 | `contextfirstparam` | `context.Context` not the first parameter |
 | `testhelper` | Test helper taking `*testing.T` without `t.Helper()` |
+| `tlsconfigrand` | Writes to the deprecated `tls.Config.Rand` field |
+| `godebugremoved` | `//go:debug` naming a setting removed in Go 1.27 |
 
 ### Naming
 
@@ -478,6 +532,37 @@ they exist purely as syntactic input for the analyzers.
 | `docparamblock` | Javadoc `Parameters:`/`Returns:` blocks in doc comments |
 | `doctutorialvoice` | Tutorial voice (`Lets you`, `Use this to`, `Here we`) |
 | `teststructuredblock` | `Workflow:`/`Purpose:`/etc. in test doc comments |
+
+### Modernizers (golang.org/x/tools, report-only)
+
+21 analyzers imported from the upstream `modernize` suite,
+the same set `go fix` runs. Importing them means the shared
+rules track each Go release without cairnlint maintaining a
+copy: `any`, `atomictypes`, `embedlit`, `forvar`,
+`importcomment`, `mapsloop`, `minmax`, `newexpr`,
+`omitzero`, `plusbuild`, `rangeint`, `reflecttypefor`,
+`slicesbackward`, `slicescontains`, `slicessort`,
+`stditerators`, `stringscut`, `stringscutprefix`,
+`stringsseq`, `unsafefuncs`, `waitgroupgo`.
+
+Run `cairnlint --list` for the one-line description of each.
+Suppress them the same way as any other analyzer, by name:
+`//nolint:rangeint`.
+
+Three upstream analyzers are deliberately left out because
+a cairnlint rule already covers the same ground and would
+report the same line twice:
+
+| Skipped | Covered by |
+| ---- | ---- |
+| `errorsastype` | `prefererrorsastype` (fires on every `errors.As`) |
+| `stringsbuilder` | `stringconcatinloop` |
+| `testingcontext` | `contextbackground` and siblings |
+
+Two more are absent because upstream disabled them in its
+own suite, and cairnlint keeps its own versions: `bloop`
+(see `preferbloop`) and `fmtappendf` (see
+`preferfmtappendf`).
 
 ## Adding a new analyzer
 

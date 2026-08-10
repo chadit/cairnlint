@@ -76,9 +76,54 @@ func checkBlockForWGGoFanout(stmts []ast.Stmt, pass *analysis.Pass) {
 			continue
 		}
 
+		if !goVersionAtLeast(pass, addCall.Pos(), goVersion125) {
+			continue
+		}
+
 		pass.Reportf(addCall.Pos(),
 			"wg.Add(N) + loop spawning N goroutines with defer wg.Done() can be replaced with wg.Go(fn) (Go 1.25)")
 	}
+}
+
+// wgDoneMethod is the method name on sync.WaitGroup that decrements the
+// counter. Extracted to a constant so goconst does not flip over its
+// default threshold as more analyzers reference WaitGroup internals.
+const wgDoneMethod = "Done"
+
+// isMatchingGoWithDeferredDone reports whether stmt is a `go funcLit(...)`
+// whose body starts with `defer wg.Done()` on the supplied receiver. The
+// defer must be the first statement in the body so the Done fires on every
+// exit path, matching wg.Go's guarantee.
+func isMatchingGoWithDeferredDone(stmt ast.Stmt, receiver string, info *types.Info) bool {
+	goStmt, isGo := stmt.(*ast.GoStmt)
+	if !isGo {
+		return false
+	}
+
+	funcLit, isFuncLit := goStmt.Call.Fun.(*ast.FuncLit)
+	if !isFuncLit || funcLit.Body == nil || len(funcLit.Body.List) == 0 {
+		return false
+	}
+
+	deferStmt, isDefer := funcLit.Body.List[0].(*ast.DeferStmt)
+	if !isDefer {
+		return false
+	}
+
+	sel, isSel := deferStmt.Call.Fun.(*ast.SelectorExpr)
+	if !isSel || sel.Sel.Name != wgDoneMethod {
+		return false
+	}
+
+	if !isWaitGroupReceiver(sel.X, info) && !isWaitGroupMethod(sel, info) {
+		return false
+	}
+
+	if len(deferStmt.Call.Args) != 0 {
+		return false
+	}
+
+	return receiverIdent(sel.X) == receiver
 }
 
 // extractFanoutLoop checks whether stmt is a for/range loop whose body is
