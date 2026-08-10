@@ -22,3 +22,25 @@ updates:
           - "*"
         update-types:
           - major
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    # Without this, Dependabot touches only the three direct requires and
+    # leaves the "// indirect" block to move whenever a parent happens to pull
+    # it forward. "all" covers both.
+    allow:
+      - dependency-type: all
+    groups:
+      gomod-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      gomod-major:
+        patterns:
+          - "*"
+        update-types:
+          - major
