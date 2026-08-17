@@ -54,6 +54,7 @@ func Categories() []Category {
 				bufferPeekStoreAnalyzer(),
 				typedNilErrorAnalyzer(),
 				reflectInLoopAnalyzer(),
+				reflectDeepEqualScalarAnalyzer(),
 				benchReportAllocsAnalyzer(),
 				benchResetTimerAnalyzer(),
 				builderGrowAnalyzer(),

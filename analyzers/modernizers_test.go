@@ -68,8 +68,10 @@ func TestModernizersAreRegistered(t *testing.T) {
 
 	superseded := supersededByCairnlint()
 
-	registered := make(map[string]bool)
-	for _, analyzer := range analyzers.All() {
+	all := analyzers.All()
+
+	registered := make(map[string]bool, len(all))
+	for _, analyzer := range all {
 		registered[analyzer.Name] = true
 	}
 

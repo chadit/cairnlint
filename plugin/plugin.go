@@ -26,7 +26,7 @@ func (c *cairnlintPlugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 	return analyzers.All(), nil
 }
 
-//nolint:revive // receiver unused; interface contract from golangci-lint plugin API
+//nolint:revive,nogetterprefix // receiver unused and Get prefix both fixed by golangci-lint's LinterPlugin interface
 func (c *cairnlintPlugin) GetLoadMode() string {
 	// cairnlint uses type information for call resolution,
 	// struct field type checking, and scope analysis.

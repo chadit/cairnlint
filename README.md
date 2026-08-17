@@ -471,6 +471,7 @@ confirm.
 | `reflectnokindcheck` | `reflect.Type.Fields()`/`NumField()` without Kind |
 | `bufferpeekstore` | `Peek()` result used after buffer mutation (SSA) |
 | `reflectinloop` | `reflect.ValueOf`/`TypeOf` inside loops |
+| `reflectdeepequalscalar` | `reflect.DeepEqual` on scalar operands (use `==`; differing types are always false) |
 | `benchreportallocs` | Benchmark missing `b.ReportAllocs()` |
 | `benchresettimer` | Benchmark setup without `b.ResetTimer()` |
 | `buildergrow` | `strings.Builder` in loop without `Grow()` |
