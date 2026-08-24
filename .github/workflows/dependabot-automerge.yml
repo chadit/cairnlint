@@ -8,7 +8,8 @@ permissions:
 
 jobs:
   automerge:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cairnlint]
+    timeout-minutes: 5
     # The repository guard stops the job running in forks, where the token
     # cannot merge anything and the run only produces noise.
     if: >-
@@ -18,8 +19,23 @@ jobs:
       # Queues the merge rather than performing it. GitHub holds the pull
       # request until the required Lint and Test checks pass, so a broken
       # update stays open instead of landing on main.
+      #
+      # The mutation runs directly rather than through `gh pr merge --auto`,
+      # which also queries the deprecated projectCards field and fails on
+      # older gh builds.
       - name: Enable auto-merge
-        run: gh pr merge --auto --squash "$PR_URL"
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          pr_id=$(gh api "repos/${GH_REPO}/pulls/${PR_NUMBER}" --jq .node_id)
+          # $id below is a GraphQL variable, not a shell one.
+          # shellcheck disable=SC2016
+          gh api graphql -F id="${pr_id}" -f query='
+            mutation($id: ID!) {
+              enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: SQUASH}) {
+                clientMutationId
+              }
+            }'

@@ -1,0 +1,4 @@
+# The CI image pulls its toolchain from the network, so the build context
+# needs nothing from the repository.
+*
+!Dockerfile

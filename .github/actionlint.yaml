@@ -1,0 +1,5 @@
+# Custom self-hosted runner label actionlint would otherwise reject as unknown.
+# Assigned by the dotai fleet manager from its config/runners.conf.
+self-hosted-runner:
+  labels:
+    - cairnlint

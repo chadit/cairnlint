@@ -19,47 +19,37 @@ permissions:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cairnlint]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.26"
-
-      - name: Lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: latest
-
-      - name: Test
-        run: go test -race -count=1 ./...
-
-      - name: Build
-        run: go build -o cairnlint .
+      - name: Lint, test, build
+        run: |
+          ./scripts/ci-container.sh run -- bash -c \
+            'golangci-lint run ./... && go test -race -count=1 ./... && go build -o cairnlint .'
 
   release:
     name: Release
     needs: validate
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, cairnlint]
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.26"
-
       - name: Compute next version
         id: version
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
           latest=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           major=$(echo "$latest" | sed 's/v//' | cut -d. -f1)
           minor=$(echo "$latest" | sed 's/v//' | cut -d. -f2)
           patch=$(echo "$latest" | sed 's/v//' | cut -d. -f3)
 
-          case "${{ inputs.bump }}" in
+          case "${BUMP}" in
             major) major=$((major + 1)); minor=0; patch=0 ;;
             minor) minor=$((minor + 1)); patch=0 ;;
             patch) patch=$((patch + 1)) ;;
@@ -67,22 +57,28 @@ jobs:
 
           next="v${major}.${minor}.${patch}"
           echo "tag=${next}" >> "$GITHUB_OUTPUT"
-          echo "Previous: ${latest} -> Next: ${next} (${{ inputs.bump }} bump)"
+          echo "Previous: ${latest} -> Next: ${next} (${BUMP} bump)"
 
       - name: Create tag
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ steps.version.outputs.tag }}"
-          git push origin "${{ steps.version.outputs.tag }}"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
 
+      # Cross-compiles in the container so the release binaries come from the
+      # same pinned-to-latest toolchain the gate used.
       - name: Build binaries
         run: |
-          mkdir -p dist
-          GOOS=linux GOARCH=amd64 go build -o dist/cairnlint-linux-amd64 .
-          GOOS=linux GOARCH=arm64 go build -o dist/cairnlint-linux-arm64 .
-          GOOS=darwin GOARCH=amd64 go build -o dist/cairnlint-darwin-amd64 .
-          GOOS=darwin GOARCH=arm64 go build -o dist/cairnlint-darwin-arm64 .
+          ./scripts/ci-container.sh run -- bash -c '
+            mkdir -p dist
+            GOOS=linux GOARCH=amd64 go build -o dist/cairnlint-linux-amd64 .
+            GOOS=linux GOARCH=arm64 go build -o dist/cairnlint-linux-arm64 .
+            GOOS=darwin GOARCH=amd64 go build -o dist/cairnlint-darwin-amd64 .
+            GOOS=darwin GOARCH=arm64 go build -o dist/cairnlint-darwin-arm64 .
+          '
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2

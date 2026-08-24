@@ -12,6 +12,7 @@ linters:
     # Explicitly disabled linters (as per requirements)
     - forbidigo # Forbid identifiers - too restrictive
     - exhaustruct # Exhaustive struct initialization - design choice
+    - exhaustruct_v5 # Same choice; latest golangci-lint ships both names
     - depguard # Import restrictions - not needed
     - lll # Line length - handled by gofmt
     - cyclop # Cyclomatic complexity - duplicate of gocyclo
