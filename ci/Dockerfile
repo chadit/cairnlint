@@ -4,7 +4,7 @@
 
 # version-pin: skip gate tooling is always-latest by policy; the compile
 # toolchain is governed by go.mod, not this tag
-FROM golang:alpine
+FROM docker.io/library/golang:alpine
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
