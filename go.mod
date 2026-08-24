@@ -1,6 +1,6 @@
 module github.com/chadit/cairnlint
 
-go 1.26
+go 1.27
 
 require (
 	github.com/golangci/plugin-module-register v0.1.2
