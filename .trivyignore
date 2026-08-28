@@ -1,0 +1,7 @@
+# cairnlint trivy suppressions
+
+# ci/Dockerfile builds a one-shot test-runner image (CMD ["/bin/bash"], run by
+# scripts/ci-container.sh with --rm). rules/docker.md exempts one-shot
+# containers from HEALTHCHECK; a health probe on a container that exits when the
+# suite finishes would report nothing useful.
+DS-0026

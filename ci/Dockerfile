@@ -22,10 +22,11 @@ RUN go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest \
     && install -m 0755 /cache/go/bin/golangci-lint /usr/local/bin/golangci-lint \
     && golangci-lint --version
 
-# Bind-mounted at run time under whichever uid the runner maps in.
-RUN mkdir -p /cache /work \
-    && chmod 0777 /cache /work \
-    && adduser -D -u 1001 ci
+# ci-container.sh always bind-mounts both paths, and a mount takes the host
+# directory's ownership, so these modes only apply when the image runs unmounted.
+RUN adduser -D -u 1001 ci \
+    && mkdir -p /cache /work \
+    && chown ci:ci /cache /work
 
 WORKDIR /work
 USER 1001

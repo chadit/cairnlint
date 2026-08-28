@@ -202,13 +202,16 @@ The LLM's workflow looks like this:
    --type go --glob '!*_test.go'`)
 5. Report genuine issues, dismiss false positives
 
-### Agent-only analyzers (3)
+### Agent-only analyzers (6)
 
 | Analyzer | What it flags |
 | ---- | ---- |
 | `agentexportedintestfile` | Exported decls in augmented `_test.go` files |
 | `aibuzzwords` | AI-flavored vocabulary, hedging, and clichés in comments |
 | `agentstubbody` | Functions whose body does nothing their name or doc claims |
+| `agentloneimpl` | Interfaces with exactly one implementing type in the package |
+| `agentpassthrough` | Forward-only methods and types whose every method forwards |
+| `agentloneparam` | Parameters given the same constant at every call site |
 
 `agentexportedintestfile` flags exported func, var,
 const, and type declarations in same-package test files
@@ -245,6 +248,41 @@ compile and pass the standard linters, so only a reader
 catches the gap. A no-param, no-doc no-op (interface
 satisfier, null object) is left alone; the rest is for an
 LLM to confirm or dismiss.
+
+`agentloneimpl` flags an interface that exactly one type
+in the same package implements. An interface written for
+one implementation carries a generality nothing uses: the
+concrete type can go into the signature instead, which
+removes the interface, any compile-time assertion, and
+the indirection at every call site. The count is
+package-scoped, so an implementation elsewhere in the
+module is invisible here and the LLM checks before
+acting. The plain variant of a package that has
+`_test.go` files is skipped, because the augmented
+variant sees any test double and a double is what
+legitimately clears the finding.
+
+`agentpassthrough` flags methods whose body is a single
+call forwarding every parameter onward, and reports at
+the type instead when a one-field struct's whole method
+set forwards. Fowler calls the type-level shape a Middle
+Man. Thin forwarding is sometimes the point (an adapter
+at a package boundary, a method promoted to satisfy an
+external interface), so the analyzer reports the shape
+and leaves the reason to the LLM.
+
+`agentloneparam` flags a parameter given the same
+constant at every call site in the package. A parameter
+with one value is a knob nothing turns: the branch it
+selects never varies, so the parameter, the argument at
+each call site, and the unreachable half of the body come
+out together. Only unexported callees with two or more
+call sites are considered, and a callee whose name is
+ever used as a value is skipped because its arguments are
+then invisible. `unparam` is the closest existing check,
+but it reports nothing for this shape in practice, and
+revive's `unused-parameter` covers only the case where
+the body ignores the parameter outright.
 
 ### Adding a new agent-only analyzer
 
