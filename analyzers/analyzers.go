@@ -107,6 +107,7 @@ func Categories() []Category {
 				testHelperMarkerAnalyzer(),
 				tlsConfigRandAnalyzer(),
 				goDebugRemovedAnalyzer(),
+				namedResultUseAnalyzer(),
 			},
 		},
 		{

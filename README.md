@@ -551,6 +551,7 @@ confirm.
 | `testhelper` | Test helper taking `*testing.T` without `t.Helper()` |
 | `tlsconfigrand` | Writes to the deprecated `tls.Config.Rand` field |
 | `godebugremoved` | `//go:debug` naming a setting removed in Go 1.27 |
+| `namedresultuse` | Named result assigned in the body or returned bare (doc-only names and defer assignment are fine) |
 
 ### Naming
 
