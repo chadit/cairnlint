@@ -59,12 +59,13 @@ jobs:
           echo "tag=${next}" >> "$GITHUB_OUTPUT"
           echo "Previous: ${latest} -> Next: ${next} (${BUMP} bump)"
 
+      # The runner host's global git config supplies the identity and signs
+      # tags with its GPG key, so no bot identity is set here: an email with no
+      # matching secret key makes the signed tag fail.
       - name: Create tag
         env:
           TAG: ${{ steps.version.outputs.tag }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
           git tag -a "${TAG}" -m "Release ${TAG}"
           git push origin "${TAG}"
 
