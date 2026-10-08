@@ -2,82 +2,47 @@ package analyzers
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/passes/inspect"
-	"golang.org/x/tools/go/ast/inspector"
 )
 
-// wrappedContextBackgroundAnalyzer returns an analyzer that flags
-// context.WithCancel/WithTimeout/WithDeadline wrapping context.Background()
-// in test files. Even wrapped, the base context should be t.Context()
-// so it is canceled when the test ends.
+// wrappedContextBackgroundAnalyzer returns an analyzer that flags the context
+// derivation functions wrapping context.Background() in test files. Even
+// wrapped, the base context should be t.Context() so it is canceled at the
+// end of the test. WithoutCancel is left out because its result is never
+// canceled whatever the base; contextbackground still reports the inner
+// call. The gate and scope rules match contextbackground, since the advice
+// is the same.
 func wrappedContextBackgroundAnalyzer() *analysis.Analyzer {
-	return &analysis.Analyzer{
-		Name:     "wrappedcontextbackground",
-		Doc:      "flags context.With*(context.Background()) in test files; use t.Context() as base",
-		Run:      runWrappedContextBackground,
-		Requires: []*analysis.Analyzer{inspect.Analyzer},
-	}
+	return testCallAnalyzer(&testCallConfig{
+		name:             "wrappedcontextbackground",
+		doc:              "flags context.With*/AfterFunc(context.Background()) in test files; use t.Context() as base",
+		message:          "use t.Context() as base context in tests, not context.Background()",
+		matchers:         contextWrapperMatchers(),
+		argMatches:       hasBackgroundArg,
+		suggestsTContext: true,
+	})
 }
 
-func runWrappedContextBackground(pass *analysis.Pass) (any, error) {
-	wrapperFuncs := []callMatcher{
+// contextWrapperMatchers lists the context derivation functions this analyzer
+// reports. contextbackground reads the same list to leave those calls' inner
+// context.Background() to this analyzer, so each line is reported once.
+func contextWrapperMatchers() []callMatcher {
+	return []callMatcher{
 		{pkgPath: contextPkgPath, funcName: "WithCancel"},
+		{pkgPath: contextPkgPath, funcName: "WithCancelCause"},
 		{pkgPath: contextPkgPath, funcName: "WithTimeout"},
+		{pkgPath: contextPkgPath, funcName: "WithTimeoutCause"},
 		{pkgPath: contextPkgPath, funcName: "WithDeadline"},
+		{pkgPath: contextPkgPath, funcName: "WithDeadlineCause"},
+		{pkgPath: contextPkgPath, funcName: "AfterFunc"},
 	}
-
-	if !hasTestFiles(pass) {
-		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
-	}
-
-	insp, castOK := pass.ResultOf[inspect.Analyzer].(*inspector.Inspector)
-	if !castOK {
-		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
-	}
-
-	nodeFilter := []ast.Node{
-		(*ast.CallExpr)(nil),
-	}
-
-	insp.WithStack(nodeFilter, func(node ast.Node, push bool, stack []ast.Node) bool {
-		if !push {
-			return true
-		}
-
-		call, isCall := node.(*ast.CallExpr)
-		if !isCall {
-			return true
-		}
-
-		if !isTestFile(pass, call) {
-			return true
-		}
-
-		if !matchesAny(call, pass.TypesInfo, wrapperFuncs) {
-			return true
-		}
-
-		if !hasBackgroundArg(call, pass) {
-			return true
-		}
-
-		if isInsideSynctestClosure(stack, pass.TypesInfo) {
-			return true
-		}
-
-		pass.Reportf(call.Pos(), "use t.Context() as base context in tests, not context.Background()")
-
-		return true
-	})
-
-	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 }
 
 // hasBackgroundArg reports whether the first argument to call is
 // context.Background().
-func hasBackgroundArg(call *ast.CallExpr, pass *analysis.Pass) bool {
+func hasBackgroundArg(call *ast.CallExpr, info *types.Info) bool {
 	if len(call.Args) == 0 {
 		return false
 	}
@@ -87,5 +52,5 @@ func hasBackgroundArg(call *ast.CallExpr, pass *analysis.Pass) bool {
 		return false
 	}
 
-	return isCallTo(argCall, pass.TypesInfo, contextPkgPath, "Background")
+	return isCallTo(argCall, info, contextPkgPath, "Background")
 }

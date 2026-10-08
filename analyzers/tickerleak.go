@@ -9,13 +9,20 @@ import (
 )
 
 // tickerLeakAnalyzer returns an analyzer that flags time.NewTicker and
-// time.NewTimer calls where the returned value is never stopped via
-// defer. Tickers that aren't stopped leak a goroutine forever. Timers
-// leak until expiry.
+// time.NewTimer calls where the returned value is never stopped via defer,
+// in files whose language version is below Go 1.23. Before 1.23 the runtime
+// kept a reference to every unstopped timer, so a ticker was never collected
+// and a timer lived until it fired. Go 1.23 made unreferenced timers eligible
+// for collection whether or not Stop was called, and Go 1.27 removed the
+// asynctimerchan setting that could restore the old behavior, so from 1.23
+// on the rule has nothing to catch. The runtime keys that change on the main
+// module's go line and the toolchain; the file's language version stands in
+// for both here, so a //go:build tag below 1.23 inside a newer module still
+// gets a report.
 func tickerLeakAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "tickerleak",
-		Doc:      "flags time.NewTicker/NewTimer without defer Stop; unstopped tickers leak a goroutine, timers leak until expiry",
+		Doc:      "flags time.NewTicker/NewTimer without defer Stop below Go 1.23, where an unstopped ticker is never collected and a timer lives until it fires",
 		Run:      runTickerLeak,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
@@ -53,6 +60,10 @@ func runTickerLeak(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
+		if goVersionAtLeast(pass, assign.Pos(), goVersion123) {
+			return true
+		}
+
 		lhsIdent, isIdent := assign.Lhs[0].(*ast.Ident)
 		if !isIdent {
 			return true
@@ -76,9 +87,9 @@ func runTickerLeak(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		msg := "time.NewTimer without defer Stop leaks until expiry; add defer %s.Stop() after creation"
+		msg := "before Go 1.23 a time.NewTimer without defer Stop is not collected until it fires; add defer %s.Stop() after creation"
 		if isTicker {
-			msg = "time.NewTicker without defer Stop leaks a goroutine; add defer %s.Stop() after creation"
+			msg = "before Go 1.23 a time.NewTicker without defer Stop is never collected; add defer %s.Stop() after creation"
 		}
 
 		pass.Reportf(assign.Pos(), msg, varName)

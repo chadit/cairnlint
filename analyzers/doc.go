@@ -60,8 +60,8 @@
 //
 // Both mapprealloc and buildergrow accept a -min-range-len flag
 // (default 8) that controls the element count below which diagnostics
-// on literal range sources are suppressed. The default aligns with the
-// Go runtime's map bucket size.
+// on literal range sources are suppressed. The default matches the Go
+// runtime's map group size.
 //
 //	cairnlint -mapprealloc.min-range-len=4 ./...
 //	cairnlint -buildergrow.min-range-len=16 ./...
@@ -80,7 +80,7 @@
 //   - strings.Builder API: https://pkg.go.dev/strings#Builder
 //   - strings.Builder source (growth strategy): https://go.dev/src/strings/builder.go
 //
-// General Go performance and pre-allocation best practices:
+// General Go performance and pre-allocation guidance:
 //
 //   - Uber Go Style Guide, "Prefer Specifying Container Capacity": https://github.com/uber-go/guide/blob/master/style.md
 //   - Dave Cheney, "High Performance Go Workshop" (GopherCon 2019): https://dave.cheney.net/high-performance-go-workshop/gophercon-2019.html

@@ -1,5 +1,7 @@
 package mapprealloc
 
+import "iter"
+
 // BadMapLiteralInLoop populates map literal in range loop.
 func BadMapLiteralInLoop(items []string) map[string]int {
 	index := map[string]int{} // want `map index populated in range loop without capacity hint`
@@ -89,4 +91,67 @@ func BadLargeLiteralSlice() map[string]int {
 	}
 
 	return index
+}
+
+// GoodNestedLoopWrite accumulates across the outer loop, so neither range
+// source bounds the map and no hint can be named.
+func GoodNestedLoopWrite(groups [][]string) map[string]int {
+	index := make(map[string]int)
+	for _, group := range groups {
+		for idx, item := range group {
+			index[item] = idx
+		}
+	}
+
+	return index
+}
+
+// GoodIteratorSource ranges over a function iterator, which has no len.
+func GoodIteratorSource(items iter.Seq[string]) map[string]bool {
+	set := make(map[string]bool)
+	for item := range items {
+		set[item] = true
+	}
+
+	return set
+}
+
+// GoodChannelSource ranges over a channel, which has no usable len either.
+func GoodChannelSource(items <-chan string) map[string]bool {
+	set := make(map[string]bool)
+	for item := range items {
+		set[item] = true
+	}
+
+	return set
+}
+
+// BadIntegerSource ranges over an integer, so the integer is the hint.
+func BadIntegerSource(n int) map[int]bool {
+	seen := make(map[int]bool) // want `use make\(map\[K\]V, n\) to pre-allocate`
+	for idx := range n {
+		seen[idx] = true
+	}
+
+	return seen
+}
+
+// GoodSmallIntegerLiteral stays below the threshold.
+func GoodSmallIntegerLiteral() map[int]bool {
+	seen := make(map[int]bool)
+	for idx := range 4 {
+		seen[idx] = true
+	}
+
+	return seen
+}
+
+// BadLargeIntegerLiteral is at or above the threshold.
+func BadLargeIntegerLiteral() map[int]bool {
+	seen := make(map[int]bool) // want `use make\(map\[K\]V, n\) to pre-allocate`
+	for idx := range 16 {
+		seen[idx] = true
+	}
+
+	return seen
 }

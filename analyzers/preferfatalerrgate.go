@@ -173,7 +173,7 @@ func addrOperandObject(expr ast.Expr, info *types.Info) (types.Object, bool) {
 // bodyHalts reports whether body stops fall-through, either via a Goexit-style
 // testing call (Fatal, FailNow, Skip) or a trailing return/panic/branch.
 func bodyHalts(body *ast.BlockStmt, info *types.Info) bool {
-	halts := false
+	var halts bool
 
 	ast.Inspect(body, func(node ast.Node) bool {
 		if halts {

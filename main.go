@@ -67,16 +67,16 @@ func main() {
 		os.Exit(exitUsage)
 	}
 
-	all := analyzers.All()
+	all := analyzers.WrapWithNolint(analyzers.WrapSkipGenerated(analyzers.All()))
 
 	agentMode := consumeAgentFlag() || analyzers.DetectAgentCaller()
 	if agentMode {
-		all = append(all, analyzers.WrapAgentFileOutput(analyzers.AgentOnly())...)
+		all = append(all, analyzers.WrapForAgentFile(analyzers.AgentOnly())...)
 	}
 
 	// All and AgentOnly already strip suggested fixes, so nothing reaching the
 	// multichecker carries an edit it could apply.
-	multichecker.Main(analyzers.WrapWithNolint(analyzers.WrapSkipGenerated(all))...)
+	multichecker.Main(all...)
 }
 
 // editFlags are the multichecker driver flags that rewrite source files.

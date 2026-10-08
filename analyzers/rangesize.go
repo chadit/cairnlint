@@ -1,6 +1,10 @@
 package analyzers
 
-import "go/ast"
+import (
+	"go/ast"
+	"go/token"
+	"strconv"
+)
 
 // defaultMinRangeLen is the default threshold below which range-loop
 // diagnostics are suppressed.  Maps <= 8 entries fit in one bucket and
@@ -8,14 +12,27 @@ import "go/ast"
 // iterations in 2-3 allocs.
 const defaultMinRangeLen = 8
 
-// rangeSourceLiteralLen returns the statically-known element count of
-// expr when it is a composite literal or a local variable assigned from
-// one. Returns -1 for any dynamic expression whose length cannot be
-// determined at compile time.
+// rangeSourceLiteralLen returns the statically-known iteration count of
+// expr when it is a composite literal, an integer literal (a Go 1.22 range
+// over an integer), or a local variable assigned from either. Returns -1
+// for any dynamic expression whose length cannot be determined at compile
+// time.
 func rangeSourceLiteralLen(expr ast.Expr) int {
 	switch node := expr.(type) {
 	case *ast.CompositeLit:
 		return len(node.Elts)
+
+	case *ast.BasicLit:
+		if node.Kind != token.INT {
+			return -1
+		}
+
+		count, err := strconv.Atoi(node.Value)
+		if err != nil {
+			return -1
+		}
+
+		return count
 
 	case *ast.Ident:
 		if node.Obj == nil || node.Obj.Decl == nil {

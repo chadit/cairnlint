@@ -4,19 +4,33 @@ import (
 	"go/ast"
 	"go/token"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
 	"golang.org/x/tools/go/analysis"
 )
 
-// suppressPattern matches nolint directives in comments with optional
-// analyzer names (bare, single, or comma-separated). The `\b` after
-// `nolint` prevents false matches against identifiers like `nolintfoo`;
-// the name character class rejects accidental trailing junk such as
-// `//nolint:foo//bar` (which would previously parse as the name list
-// `foo//bar`).
-var suppressPattern = regexp.MustCompile(`//\s*nolint\b(?::([A-Za-z0-9_,\-]+))?`)
+// suppressPattern matches a nolint directive at the start of a line comment,
+// following golangci-lint: after `//` and optional spaces the word `nolint`
+// must be followed by a colon, whitespace, or the end of the comment, so
+// `//nolintfoo`, `//nolint-foo`, and `nolint` mentioned mid-sentence are not
+// directives. The name list after the colon runs to the next `//`, which is
+// how golangci-lint separates the list from its explanation, so
+// `//nolint:a/b, c // why` yields `a/b, c`. The capture keeps the colon so an
+// explicit empty list (`//nolint:`) can be told apart from a bare `//nolint`.
+var suppressPattern = regexp.MustCompile(`^//\s*nolint(?:(:(?:[^/]|/[^/])*)|\s|$)`)
+
+// suppressAllName is golangci-lint's wildcard name that suppresses every analyzer.
+const suppressAllName = "all"
+
+// fileLine identifies one source line across the files of a pass. Keying
+// suppression by line number alone let a directive in one file silence the
+// same line number in every other file of the package.
+type fileLine struct {
+	filename string
+	line     int
+}
 
 // WrapWithNolint wraps each analyzer so diagnostics suppressed by a matching
 // //nolint directive are dropped. This gives standalone cairnlint the same
@@ -44,8 +58,8 @@ func wrapAnalyzer(orig *analysis.Analyzer) *analysis.Analyzer {
 		originalReport := pass.Report
 
 		originalPass.Report = func(diag analysis.Diagnostic) {
-			line := pass.Fset.Position(diag.Pos).Line
-			if nolintLines[line] {
+			pos := pass.Fset.Position(diag.Pos)
+			if nolintLines[fileLine{filename: pos.Filename, line: pos.Line}] {
 				return
 			}
 
@@ -59,12 +73,22 @@ func wrapAnalyzer(orig *analysis.Analyzer) *analysis.Analyzer {
 }
 
 // directive is one parsed //nolint comment plus the line range it suppresses.
-// names is the raw comma-separated list from `//nolint:a,b,c`; an empty
-// string means a bare `//nolint` (applies to every analyzer).
+// names holds the lowercased analyzer names from `//nolint:a,b,c`; all is set
+// for a bare `//nolint` or `//nolint:all`. filename is the position-adjusted
+// name, so a //line directive moves the suppression along with the
+// diagnostics it covers. filename leads names because govet's fieldalignment
+// wants the pointer-bearing bytes packed at the front.
 type directive struct {
-	names     string
+	filename  string
+	names     []string
 	startLine int
 	endLine   int
+	all       bool
+}
+
+// applies reports whether the directive suppresses analyzerName.
+func (d directive) applies(analyzerName string) bool {
+	return d.all || slices.Contains(d.names, analyzerName)
 }
 
 // fileDirectiveCache memoizes parsed directives per *ast.File so the full
@@ -94,6 +118,12 @@ func directivesFor(fset *token.FileSet, file *ast.File) []directive {
 	return list
 }
 
+// span is the line range one directive comment suppresses.
+type span struct {
+	start   token.Position
+	endLine int
+}
+
 // collectDirectives walks file once, gathering both the trailing-comment
 // form (line range is a single line) and the leading-comment form (line
 // range spans the associated node so whole-function suppression works).
@@ -101,15 +131,11 @@ func collectDirectives(fset *token.FileSet, file *ast.File) []directive {
 	var list []directive
 
 	for _, cg := range file.Comments {
-		for _, comment := range cg.List {
-			names, ok := parseDirective(comment.Text)
-			if !ok {
-				continue
-			}
+		list = appendDirectives(list, cg, func(comment *ast.Comment) span {
+			pos := fset.Position(comment.Pos())
 
-			line := fset.Position(comment.Pos()).Line
-			list = append(list, directive{names: names, startLine: line, endLine: line})
-		}
+			return span{start: pos, endLine: pos.Line}
+		})
 	}
 
 	// ast.NewCommentMap may attach one comment group to multiple nodes
@@ -120,79 +146,97 @@ func collectDirectives(fset *token.FileSet, file *ast.File) []directive {
 	// two more than a reader might expect, but never less.
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 	for node, groups := range cmap {
-		start := fset.Position(node.Pos()).Line
-		end := fset.Position(node.End()).Line
+		nodeSpan := span{start: fset.Position(node.Pos()), endLine: fset.Position(node.End()).Line}
 
 		for _, cg := range groups {
-			for _, comment := range cg.List {
-				names, ok := parseDirective(comment.Text)
-				if !ok {
-					continue
-				}
-
-				list = append(list, directive{names: names, startLine: start, endLine: end})
-			}
+			list = appendDirectives(list, cg, func(*ast.Comment) span { return nodeSpan })
 		}
 	}
 
 	return list
 }
 
-// buildNolintMap returns the set of line numbers suppressed by a matching
+// appendDirectives adds one directive per //nolint comment in cg, covering
+// the span that spanOf assigns to that comment.
+func appendDirectives(list []directive, cg *ast.CommentGroup, spanOf func(*ast.Comment) span) []directive {
+	for _, comment := range cg.List {
+		names, all, ok := parseDirective(comment.Text)
+		if !ok {
+			continue
+		}
+
+		lines := spanOf(comment)
+		list = append(list, directive{
+			names:     names,
+			filename:  lines.start.Filename,
+			startLine: lines.start.Line,
+			endLine:   lines.endLine,
+			all:       all,
+		})
+	}
+
+	return list
+}
+
+// buildNolintMap returns the set of file lines suppressed by a matching
 // //nolint directive for analyzerName. The heavy work of parsing directives
 // and building the comment map is cached per file, so this function is
 // cheap to call from each wrapped analyzer.
-func buildNolintMap(pass *analysis.Pass, analyzerName string) map[int]bool {
-	result := make(map[int]bool)
-	fillNolintMap(result, pass, analyzerName)
+func buildNolintMap(pass *analysis.Pass, analyzerName string) map[fileLine]bool {
+	result := make(map[fileLine]bool)
+
+	for _, file := range pass.Files {
+		for _, suppression := range directivesFor(pass.Fset, file) {
+			markSuppressed(result, suppression, analyzerName)
+		}
+	}
 
 	return result
 }
 
-// fillNolintMap records into result every line suppressed by a //nolint
-// directive matching analyzerName.
-func fillNolintMap(result map[int]bool, pass *analysis.Pass, analyzerName string) {
-	for _, file := range pass.Files {
-		for _, d := range directivesFor(pass.Fset, file) {
-			if !namesApply(d.names, analyzerName) {
-				continue
-			}
+// markSuppressed records every line of suppression into result when the
+// directive applies to analyzerName.
+func markSuppressed(result map[fileLine]bool, suppression directive, analyzerName string) {
+	if !suppression.applies(analyzerName) {
+		return
+	}
 
-			for line := d.startLine; line <= d.endLine; line++ {
-				result[line] = true
-			}
-		}
+	for line := suppression.startLine; line <= suppression.endLine; line++ {
+		result[fileLine{filename: suppression.filename, line: line}] = true
 	}
 }
 
-// parseDirective extracts the raw name list from a //nolint comment, or
-// reports !ok when text is not a directive. An empty names string means
-// a bare directive (suppresses every analyzer).
-func parseDirective(text string) (string, bool) {
+// parseDirective extracts the lowercased analyzer names from a //nolint
+// comment and reports whether the directive covers every analyzer. The
+// third result is false when text is not a directive. An explicit empty
+// list (`//nolint:`) is a directive that names nothing, which golangci-lint
+// treats as matching no linter.
+func parseDirective(text string) ([]string, bool, bool) {
 	if !strings.Contains(text, "nolint") {
-		return "", false
+		return nil, false, false
 	}
 
 	match := suppressPattern.FindStringSubmatch(text)
 	if match == nil {
-		return "", false
+		return nil, false, false
 	}
 
-	return match[1], true
-}
-
-// namesApply reports whether a directive's name list applies to analyzerName.
-// An empty list means bare //nolint and applies to every analyzer.
-func namesApply(names, analyzerName string) bool {
-	if names == "" {
-		return true
+	if match[1] == "" {
+		return nil, true, true
 	}
 
-	for name := range strings.SplitSeq(names, ",") {
-		if strings.TrimSpace(name) == analyzerName {
-			return true
+	var names []string
+
+	for name := range strings.SplitSeq(strings.TrimPrefix(match[1], ":"), ",") {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == suppressAllName {
+			return nil, true, true
+		}
+
+		if name != "" {
+			names = append(names, name)
 		}
 	}
 
-	return false
+	return names, false, true
 }

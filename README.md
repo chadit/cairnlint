@@ -5,8 +5,12 @@ Custom Go static analysis tool built on
 plus an agent-only tier for AI-assisted code review.
 Covers scope-aware checks, loop-body rules, expression
 patterns, and code quality enforcement. Generated files
-(`.pb.go`, `/gen/`, `// Code generated ... DO NOT EDIT.`)
-are automatically skipped.
+are skipped: `.pb.go`, anything under `/gen/`, and files
+whose `// Code generated ... DO NOT EDIT.` header sits
+before the package clause. A file whose positions a
+`//line` directive redirects to another Go file, as
+cmd/cgo output does, is judged by that file's header,
+so hand-written cgo sources are still checked.
 
 ## Install
 
@@ -312,7 +316,17 @@ s := "" //nolint:prefervarzero,noelse
 
 // Suppress all cairnlint analyzers on this line.
 s := "" //nolint
+s := "" //nolint:all
 ```
+
+The directive parser follows golangci-lint. Names are
+case-insensitive. Whitespace after the colon and around
+commas is ignored. Put an explanation after a second
+`//`; anything else after the list becomes part of a
+name, so `//nolint:foo reason` suppresses nothing.
+`nolint` mentioned mid-sentence is prose, not a
+directive. A directive applies only to the file it
+appears in.
 
 Common examples:
 
@@ -471,9 +485,9 @@ confirm.
 | `synctestsleep` | `time.Sleep` in tests outside synctest |
 | `synctestsleepwait` | `time.Sleep` then `synctest.Wait` |
 | `synctestrealserver` | `httptest.NewServer` inside a synctest bubble |
-| `contextbackground` | `context.Background()` in tests |
-| `contexttodo` | `context.TODO()` in tests |
-| `wrappedcontextbackground` | `context.With*(ctx.Background())` |
+| `contextbackground` | `context.Background()` where `t.Context()` is in scope (Go 1.24+); a `With*` base is left to `wrappedcontextbackground` |
+| `contexttodo` | `context.TODO()` where `t.Context()` is in scope (Go 1.24+) |
+| `wrappedcontextbackground` | `context.With*`/`AfterFunc(context.Background())` where `t.Context()` is in scope (Go 1.24+) |
 
 ### Loop-body and structural
 
@@ -482,7 +496,7 @@ confirm.
 | `deferinloop` | `defer` inside `for` loops |
 | `queryinloop` | `db.Query/Exec` and variants in loops |
 | `stringconcatinloop` | `s += x` or `s = s + x` in loops |
-| `preferbloop` | `b.N` loops in benchmarks |
+| `preferbloop` | `b.N` loops in benchmarks that `b.Loop()` can replace |
 | `dbquerywithbarebackground` | `db.*Context(ctx.Background())` |
 | `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
 | `redundantbodydrain` | `io.Copy(io.Discard, resp.Body)` before Close |
@@ -511,7 +525,7 @@ confirm.
 | `reflectinloop` | `reflect.ValueOf`/`TypeOf` inside loops |
 | `reflectdeepequalscalar` | `reflect.DeepEqual` on scalar operands (use `==`; differing types are always false) |
 | `benchreportallocs` | Benchmark missing `b.ReportAllocs()` |
-| `benchresettimer` | Benchmark setup without `b.ResetTimer()` |
+| `benchresettimer` | Setup before a `b.N` loop without `b.ResetTimer()` (`b.Loop()` resets it itself) |
 | `buildergrow` | `strings.Builder` in loop without `Grow()` |
 | `mapprealloc` | Map populated in loop without capacity hint |
 | `typednilerror` | Typed nil returned as error interface (SSA) |
@@ -526,7 +540,7 @@ confirm.
 | `gowggo` | `go wg.Go(...)` wrapping (races Add with Wait) |
 | `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
 | `preferwggofanout` | `wg.Add(N)` + N-goroutine loop with `defer wg.Done()` |
-| `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` |
+| `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` below Go 1.23 |
 | `chandirclose` | `close()` on bidirectional channel param |
 | `poolresetbeforeput` | `sync.Pool.Put` without Reset (SSA) |
 

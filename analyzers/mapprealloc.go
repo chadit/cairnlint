@@ -2,6 +2,7 @@ package analyzers
 
 import (
 	"go/ast"
+	"go/types"
 
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/passes/inspect"
@@ -9,9 +10,15 @@ import (
 )
 
 // mapPreallocAnalyzer returns an analyzer that flags maps created without a
-// capacity hint that are subsequently populated inside a range loop. Without
+// capacity hint that are then populated inside a range loop. Without
 // pre-allocation the runtime rehashes the map as it grows, wasting CPU and
 // memory.
+//
+// The hint has to be something the loop's own source can supply, so the
+// rule stays quiet when it cannot name one: a write nested inside a further
+// loop accumulates across the outer iterations, and a range over a function
+// iterator or a channel has no length at all. A range over an integer gets
+// that integer as the hint.
 //
 // The -min-range-len flag (default 8) suppresses diagnostics when the range
 // source is a literal with fewer than that many elements. Maps <= 8 entries
@@ -90,15 +97,20 @@ func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass, minRangeLen
 
 			if rangeBodyAssignsToMap(rangeStmt.Body, mapName) {
 				// Small literal range source, skip but keep scanning for
-				// subsequent range loops that may have a larger source.
+				// later range loops that may have a larger source.
 				if litLen := rangeSourceLiteralLen(rangeStmt.X); litLen >= 0 && litLen < minRangeLen {
 					continue
 				}
 
+				hint, hasHint := capacityHint(rangeStmt.X, pass.TypesInfo)
+				if !hasHint {
+					break
+				}
+
 				pass.Reportf(
 					assignStmt.Pos(),
-					"map %s populated in range loop without capacity hint; use make(map[K]V, len(source)) to pre-allocate",
-					mapName,
+					"map %s populated in range loop without capacity hint; use make(map[K]V, %s) to pre-allocate",
+					mapName, hint,
 				)
 
 				break
@@ -137,9 +149,33 @@ func isUncappedMapCreation(expr ast.Expr) bool {
 	return false
 }
 
+// capacityHint returns the expression text that sizes a map filled from a
+// range over source: len(source) for anything with a length, the integer
+// itself for a range over an integer, and false for a function iterator or
+// a channel, which have no count to offer.
+func capacityHint(source ast.Expr, info *types.Info) (string, bool) {
+	typ := info.TypeOf(source)
+	if typ == nil {
+		return "len(source)", true
+	}
+
+	switch under := typ.Underlying().(type) {
+	case *types.Signature, *types.Chan:
+		return "", false
+	case *types.Basic:
+		if under.Info()&types.IsInteger != 0 {
+			return "n", true
+		}
+	}
+
+	return "len(source)", true
+}
+
 // rangeBodyAssignsToMap reports whether the range body contains an assignment
 // of the form mapVar[...] = ... for the given map variable name. Does not
-// descend into function literals since those run in a different scope.
+// descend into function literals since those run in a different scope, nor
+// into nested loops, because a write there accumulates across the outer
+// iterations and the outer source's length is no bound for the map.
 func rangeBodyAssignsToMap(body *ast.BlockStmt, mapName string) bool {
 	if body == nil {
 		return false
@@ -152,9 +188,8 @@ func rangeBodyAssignsToMap(body *ast.BlockStmt, mapName string) bool {
 			return false
 		}
 
-		// Don't descend into closures; they capture the map but are a
-		// different execution scope and may not run synchronously.
-		if _, isFunc := node.(*ast.FuncLit); isFunc {
+		switch node.(type) {
+		case *ast.FuncLit, *ast.ForStmt, *ast.RangeStmt:
 			return false
 		}
 

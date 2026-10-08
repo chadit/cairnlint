@@ -14,6 +14,7 @@ import (
 const (
 	goVersion118 = "go1.18"
 	goVersion119 = "go1.19"
+	goVersion123 = "go1.23"
 	goVersion124 = "go1.24"
 	goVersion125 = "go1.25"
 	goVersion126 = "go1.26"

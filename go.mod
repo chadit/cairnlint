@@ -5,7 +5,7 @@ go 1.27
 require (
 	github.com/golangci/plugin-module-register v0.1.2
 	go.uber.org/goleak v1.3.0
-	golang.org/x/tools v0.50.0
+	golang.org/x/tools v0.51.0
 )
 
 require (

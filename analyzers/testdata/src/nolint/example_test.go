@@ -1,8 +1,10 @@
 // Fixture scope note:
 //
 // This file is exercised by TestNolintSuppression, which runs only the
-// contextbackground analyzer. If a future test runs additional analyzers
-// against this fixture, remember:
+// contextbackground analyzer. other_test.go in this package puts its own
+// calls on the same line numbers as the suppressed lines here, so append
+// new cases at the end of this file rather than inserting them. If a future
+// test runs additional analyzers against this fixture, remember:
 //   - commentedcode skips *_test.go files, so this file is safe from it.
 //     A non-test fixture added alongside would NOT be safe — prose like
 //     "see nolint docs" is fine, but lines starting with Go keywords
@@ -65,5 +67,48 @@ func TestNolintInProseDoesNotSuppress(t *testing.T) {
 // Trailing junk after the name list must not silently expand the list.
 func TestNolintWithTrailingJunk(t *testing.T) {
 	_ = context.Background() //nolint:someother//contextbackground // want `use t.Context\(\) instead of context.Background\(\) in tests`
+	_ = t
+}
+
+// golangci-lint's wildcard name suppresses every analyzer.
+func TestNolintAllWildcard(t *testing.T) {
+	_ = context.Background() //nolint:all // wildcard
+	_ = t
+}
+
+// golangci-lint trims whitespace after the colon and around each name.
+func TestNolintWithSpaces(t *testing.T) {
+	_ = context.Background() //nolint: someother, contextbackground // why
+	_ = t
+}
+
+// Names are case-insensitive, as in golangci-lint.
+func TestNolintUpperCase(t *testing.T) {
+	_ = context.Background() //nolint:ContextBackground
+	_ = t
+}
+
+// An explicit empty list is not the bare form and matches nothing.
+func TestNolintEmptyListDoesNotSuppress(t *testing.T) {
+	_ = context.Background() //nolint: // want `use t.Context\(\) instead of context.Background\(\) in tests`
+	_ = t
+}
+
+// A directive mentioned mid-sentence is prose, not a directive, as in
+// golangci-lint, which requires nolint at the start of the comment.
+func TestNolintMidCommentDoesNotSuppress(t *testing.T) {
+	_ = context.Background() // see //nolint docs // want `use t.Context\(\) instead of context.Background\(\) in tests`
+	_ = t
+}
+
+// A hyphen after the word is not a directive boundary.
+func TestNolintHyphenSuffixDoesNotSuppress(t *testing.T) {
+	_ = context.Background() //nolint-ish // want `use t.Context\(\) instead of context.Background\(\) in tests`
+	_ = t
+}
+
+// A single slash inside a name does not end the list; only `//` does.
+func TestNolintSingleSlashInList(t *testing.T) {
+	_ = context.Background() //nolint:a/b,contextbackground // explanation
 	_ = t
 }

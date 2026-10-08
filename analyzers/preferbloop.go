@@ -30,6 +30,13 @@ const (
 // b.StopTimer or b.StartTimer changes what the benchmark measures and can hang
 // it outright (golang/go#74967). Upstream disabled its own bloop modernizer
 // over this; the rule is sound, the blanket rewrite was not.
+//
+// A benchmark that reads b.N anywhere other than the one loop condition is
+// also left alone, as upstream's usesBenchmarkNOnce does. Under b.Loop the
+// runner sets b.N to 1 and then 0, so a slice sized by b.N is indexed out of
+// range and a second b.N loop fails with "B.Loop called with timer stopped".
+// For the same reason a loop inside a closure that captures an outer b is
+// skipped: the outer body may size data by b.N where the closure cannot see.
 func preferBLoopAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "preferbloop",
@@ -67,7 +74,7 @@ func runPreferBLoop(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		if callsBenchTimerControl(enclosingFuncBody(stack), pass.TypesInfo) {
+		if !convertibleToBLoop(node, stack, pass.TypesInfo) {
 			return true
 		}
 
@@ -127,45 +134,84 @@ func isBNSelector(expr ast.Expr, info *types.Info) bool {
 	return isTestingBExpr(sel.X, info)
 }
 
-// isTestingBExpr reports whether expr has type *testing.B.
-func isTestingBExpr(expr ast.Expr, info *types.Info) bool {
-	recvType := info.TypeOf(expr)
-	if recvType == nil {
-		return false
-	}
-
-	ptr, isPtr := recvType.(*types.Pointer)
-	if !isPtr {
-		return false
-	}
-
-	named, isNamed := ptr.Elem().(*types.Named)
-	if !isNamed {
-		return false
-	}
-
-	obj := named.Obj()
-
-	return obj.Pkg() != nil && obj.Pkg().Path() == testingPkgPath && obj.Name() == "B"
-}
-
-// enclosingFuncBody returns the body of the innermost function surrounding the
-// node on top of stack.
+// convertibleToBLoop reports whether the b.N loop on node can become b.Loop.
+// The loop's b must be a parameter of the innermost enclosing function, that
+// function must not drive the timer by hand, and b.N must appear nowhere
+// else in its body.
 //
 // Innermost is the right scope because each b.Run sub-benchmark receives its
-// own *testing.B: timer calls in an outer benchmark say nothing about whether
-// a loop inside a sub-benchmark closure can be converted.
-func enclosingFuncBody(stack []ast.Node) *ast.BlockStmt {
-	for idx := range slices.Backward(stack) {
-		switch fn := stack[idx].(type) {
-		case *ast.FuncDecl:
-			return fn.Body
-		case *ast.FuncLit:
-			return fn.Body
+// own *testing.B: timer calls and b.N reads in an outer benchmark say nothing
+// about a loop inside a sub-benchmark closure. Requiring b to be that
+// function's own parameter is what tells a sub-benchmark apart from a
+// closure that captures the outer b.
+func convertibleToBLoop(node ast.Node, stack []ast.Node, info *types.Info) bool {
+	funcType, body := enclosingFunc(stack)
+	if body == nil {
+		return false
+	}
+
+	benchObj := info.ObjectOf(bnLoopReceiver(node))
+	if benchObj == nil || !declaresParam(funcType, info, benchObj) {
+		return false
+	}
+
+	return !callsBenchTimerControl(body, info) && countBNReferences(body, info) == 1
+}
+
+// bnLoopReceiver returns the identifier before .N in a b.N loop already
+// accepted by isBNLoop, or nil when that operand is not a plain identifier.
+func bnLoopReceiver(node ast.Node) *ast.Ident {
+	var operand ast.Expr
+
+	switch stmt := node.(type) {
+	case *ast.ForStmt:
+		if bin, isBin := stmt.Cond.(*ast.BinaryExpr); isBin {
+			operand = bin.Y
+		}
+	case *ast.RangeStmt:
+		operand = stmt.X
+	}
+
+	sel, isSel := operand.(*ast.SelectorExpr)
+	if !isSel {
+		return nil
+	}
+
+	ident, _ := sel.X.(*ast.Ident)
+
+	return ident
+}
+
+// declaresParam reports whether obj is one of funcType's parameters.
+func declaresParam(funcType *ast.FuncType, info *types.Info, obj types.Object) bool {
+	if funcType.Params == nil {
+		return false
+	}
+
+	for _, field := range funcType.Params.List {
+		for _, name := range field.Names {
+			if info.Defs[name] == obj {
+				return true
+			}
 		}
 	}
 
-	return nil
+	return false
+}
+
+// enclosingFunc returns the signature and body of the innermost function
+// surrounding the node on top of stack.
+func enclosingFunc(stack []ast.Node) (*ast.FuncType, *ast.BlockStmt) {
+	for idx := range slices.Backward(stack) {
+		switch fn := stack[idx].(type) {
+		case *ast.FuncDecl:
+			return fn.Type, fn.Body
+		case *ast.FuncLit:
+			return fn.Type, fn.Body
+		}
+	}
+
+	return nil, nil
 }
 
 // callsBenchTimerControl reports whether body contains a StopTimer or
@@ -202,4 +248,25 @@ func callsBenchTimerControl(body *ast.BlockStmt, info *types.Info) bool {
 	})
 
 	return found
+}
+
+// countBNReferences counts b.N selectors in body. The loop under review
+// contributes one. Any other reference means b.N carries meaning that
+// b.Loop cannot preserve.
+func countBNReferences(body *ast.BlockStmt, info *types.Info) int {
+	if body == nil {
+		return 0
+	}
+
+	var count int
+
+	ast.Inspect(body, func(node ast.Node) bool {
+		if expr, isExpr := node.(ast.Expr); isExpr && isBNSelector(expr, info) {
+			count++
+		}
+
+		return true
+	})
+
+	return count
 }

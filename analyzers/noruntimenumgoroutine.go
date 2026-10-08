@@ -7,7 +7,7 @@ import "golang.org/x/tools/go/analysis"
 // unreliable for leak detection because the runtime goroutine count
 // includes unrelated goroutines; use goleak instead.
 func noRuntimeNumGoroutineAnalyzer() *analysis.Analyzer {
-	return testCallWithSynctestExemption(synctestExemptConfig{
+	return testCallAnalyzer(&testCallConfig{
 		name:     "noruntimenumgoroutine",
 		doc:      "flags runtime.NumGoroutine() in test files; use goleak for goroutine leak detection",
 		message:  "runtime.NumGoroutine() is unreliable for leak detection; use goleak instead",

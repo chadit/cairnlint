@@ -12,12 +12,14 @@ import (
 const benchResetTimerMessage = "benchmark has setup code without b.ResetTimer(); setup time is included in measurements"
 
 // benchResetTimerAnalyzer returns an analyzer that flags benchmark functions
-// with setup code before the benchmark loop but no b.ResetTimer() call.
-// Without ResetTimer the setup cost pollutes the measurement.
+// with setup code before a b.N loop but no b.ResetTimer() call. Without
+// ResetTimer the setup cost pollutes the measurement. Benchmarks that use
+// for b.Loop() are exempt: Loop resets the timer itself on its first call
+// (Go 1.24+), so setup before it is never measured.
 func benchResetTimerAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "benchresettimer",
-		Doc:      "flags benchmarks with setup code before the loop but no b.ResetTimer()",
+		Doc:      "flags benchmarks with setup code before a b.N loop but no b.ResetTimer()",
 		Run:      runBenchResetTimer,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
@@ -57,15 +59,16 @@ func runBenchResetTimer(pass *analysis.Pass) (any, error) {
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 }
 
-// checkBenchBody looks for a benchmark loop in the function body, checks
-// whether setup statements precede the loop, and whether b.ResetTimer()
-// is called between setup and the loop.
+// checkBenchBody looks for a b.N loop in the function body, checks whether
+// setup statements precede the loop, and whether b.ResetTimer() is called
+// between setup and the loop. A b.Loop() benchmark never matches, because
+// Loop resets the timer itself.
 func checkBenchBody(pass *analysis.Pass, funcDecl *ast.FuncDecl) {
 	if funcDecl.Body == nil || len(funcDecl.Body.List) == 0 {
 		return
 	}
 
-	loopIdx := findBenchLoopIndex(funcDecl.Body.List, pass.TypesInfo)
+	loopIdx := findBNLoopIndex(funcDecl.Body.List, pass.TypesInfo)
 	if loopIdx < 0 {
 		return
 	}
@@ -92,13 +95,14 @@ func checkBenchBody(pass *analysis.Pass, funcDecl *ast.FuncDecl) {
 	}
 }
 
-// findBenchLoopIndex returns the index of the first for statement in stmts
-// that iterates using b.Loop() or b.N. Returns -1 if none found.
-func findBenchLoopIndex(stmts []ast.Stmt, info *types.Info) int {
+// findBNLoopIndex returns the index of the first for statement in stmts
+// that iterates using b.N, in either the C-style or range form. Returns -1
+// if none found.
+func findBNLoopIndex(stmts []ast.Stmt, info *types.Info) int {
 	for idx, stmt := range stmts {
 		switch loopStmt := stmt.(type) {
 		case *ast.ForStmt:
-			if isBLoopCall(loopStmt.Cond, info) || isCStyleBNCondition(loopStmt.Cond, info) {
+			if isCStyleBNCondition(loopStmt.Cond, info) {
 				return idx
 			}
 		case *ast.RangeStmt:
@@ -111,21 +115,6 @@ func findBenchLoopIndex(stmts []ast.Stmt, info *types.Info) int {
 	return -1
 }
 
-// isBLoopCall reports whether expr is a call to b.Loop() where b is *testing.B.
-func isBLoopCall(expr ast.Expr, info *types.Info) bool {
-	call, isCall := expr.(*ast.CallExpr)
-	if !isCall {
-		return false
-	}
-
-	sel, isSel := call.Fun.(*ast.SelectorExpr)
-	if !isSel || sel.Sel.Name != "Loop" {
-		return false
-	}
-
-	return isTestingBReceiver(sel.X, info)
-}
-
 // isCStyleBNCondition reports whether expr is a binary comparison involving
 // b.N (e.g. i < b.N).
 func isCStyleBNCondition(expr ast.Expr, info *types.Info) bool {
@@ -135,28 +124,6 @@ func isCStyleBNCondition(expr ast.Expr, info *types.Info) bool {
 	}
 
 	return isBNSelector(bin.Y, info)
-}
-
-// isTestingBReceiver reports whether expr resolves to a *testing.B value.
-func isTestingBReceiver(expr ast.Expr, info *types.Info) bool {
-	exprType := info.TypeOf(expr)
-	if exprType == nil {
-		return false
-	}
-
-	ptr, isPtr := exprType.(*types.Pointer)
-	if !isPtr {
-		return false
-	}
-
-	named, isNamed := ptr.Elem().(*types.Named)
-	if !isNamed {
-		return false
-	}
-
-	obj := named.Obj()
-
-	return obj.Pkg() != nil && obj.Pkg().Path() == testingPkgPath && obj.Name() == "B"
 }
 
 // isResetTimerCall reports whether stmt is an expression statement calling
@@ -177,5 +144,5 @@ func isResetTimerCall(stmt ast.Stmt, info *types.Info) bool {
 		return false
 	}
 
-	return isTestingBReceiver(sel.X, info)
+	return isTestingBExpr(sel.X, info)
 }

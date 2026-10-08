@@ -7,7 +7,7 @@ import "golang.org/x/tools/go/analysis"
 // synctest.Test, time.Sleep advances synthetic time and is the correct
 // API. Outside of it, time.Sleep causes flaky tests.
 func synctestSleepAnalyzer() *analysis.Analyzer {
-	return testCallWithSynctestExemption(synctestExemptConfig{
+	return testCallAnalyzer(&testCallConfig{
 		name:     "synctestsleep",
 		doc:      "flags time.Sleep in test files unless inside a synctest.Test closure",
 		message:  "time.Sleep in tests is a flaky test signal; use synctest.Test with synthetic time, channels, or t.Deadline() instead",

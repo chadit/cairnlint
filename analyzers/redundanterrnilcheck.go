@@ -181,26 +181,7 @@ func isTestingFailureCall(call *ast.CallExpr, info *types.Info) bool {
 // isTestingTBReceiver reports whether expr has a type from the testing package
 // that carries the failure methods (T, B, common, or the TB interface).
 func isTestingTBReceiver(expr ast.Expr, info *types.Info) bool {
-	typ := info.TypeOf(expr)
-	if typ == nil {
-		return false
-	}
-
-	if ptr, isPtr := typ.(*types.Pointer); isPtr {
-		typ = ptr.Elem()
-	}
-
-	named, isNamed := typ.(*types.Named)
-	if !isNamed {
-		return false
-	}
-
-	obj := named.Obj()
-	if obj.Pkg() == nil || obj.Pkg().Path() != testingPkgPath {
-		return false
-	}
-
-	switch obj.Name() {
+	switch testingTypeName(info.TypeOf(expr)) {
 	case "T", "B", "common", "TB":
 		return true
 	default:

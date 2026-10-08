@@ -11,7 +11,7 @@ import (
 
 // testEntryPrefixes are the function-name prefixes the testing package runs
 // directly. Such functions are not helpers, so they are exempt.
-var testEntryPrefixes = []string{testPrefix, benchmarkPrefix, fuzzPrefix, "Example"} //nolint:gochecknoglobals // package-internal lookup table, not mutable state
+var testEntryPrefixes = []string{testPrefix, benchmarkPrefix, fuzzPrefix, examplePrefix} //nolint:gochecknoglobals // package-internal lookup table, not mutable state
 
 // testHelperMarkerAnalyzer returns an analyzer that flags a test helper taking
 // *testing.T/B/F as its first parameter that does not call t.Helper() as its

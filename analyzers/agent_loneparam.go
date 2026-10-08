@@ -192,7 +192,8 @@ func reportLoneParams(pass *analysis.Pass, callee *types.Func, seen *calleeUsage
 // so it is left out rather than reported twice.
 func paramPositions(funcDecl *ast.FuncDecl) map[int]*ast.Ident {
 	positions := make(map[int]*ast.Ident)
-	index := 0
+
+	var index int
 
 	for _, field := range funcDecl.Type.Params.List {
 		for _, name := range field.Names {

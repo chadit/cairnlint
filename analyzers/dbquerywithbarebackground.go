@@ -55,7 +55,7 @@ func runDBQueryWithBareBackground(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		if !hasBackgroundArg(call, pass) {
+		if !hasBackgroundArg(call, pass.TypesInfo) {
 			return
 		}
 

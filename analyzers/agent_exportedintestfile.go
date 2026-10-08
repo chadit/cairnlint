@@ -115,7 +115,7 @@ func isTestFrameworkFunc(name string) bool {
 		return true
 	}
 
-	prefixes := []string{testPrefix, benchmarkPrefix, fuzzPrefix, "Example"}
+	prefixes := []string{testPrefix, benchmarkPrefix, fuzzPrefix, examplePrefix}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(name, prefix) && len(name) > len(prefix) {
 			// Go requires the character after the prefix to be uppercase

@@ -77,8 +77,8 @@ var aiBuzzwordPatterns = []struct {
 // agentAIBuzzwordsAnalyzer returns an agent-only analyzer that scans
 // comments for AI-flavored vocabulary, hedging, formal transitions,
 // clichés, and preachy universals. False-positive risk is real because
-// some flagged words (robust, critical, extensive) appear legitimately
-// in technical prose. Agent mode lets an LLM triage the hits.
+// several entries on the list are also ordinary technical vocabulary.
+// Agent mode lets an LLM triage the hits.
 func agentAIBuzzwordsAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "aibuzzwords",
