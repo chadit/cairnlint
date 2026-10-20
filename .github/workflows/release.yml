@@ -67,16 +67,11 @@ jobs:
           echo "tag=${next}" >> "$GITHUB_OUTPUT"
           echo "Previous: ${latest} -> Next: ${next} (${BUMP} bump)"
 
-      # The tag push and gh release both run after the tag exists, so a
-      # missing tool would orphan the tag. The probe tests GIT_CONFIG_COUNT
-      # itself, which needs git 2.31.
-      - name: Check release tooling
+      # The tag push uses GIT_CONFIG_COUNT, which needs git 2.31. Checking
+      # before the tag is created keeps an old git from leaving a local tag
+      # that never reaches the remote.
+      - name: Check git supports GIT_CONFIG_COUNT
         run: |
-          if ! command -v gh >/dev/null 2>&1; then
-            echo "E: gh is not installed on this runner" >&2
-            exit 1
-          fi
-          gh --version
           probe=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=release.probe \
             GIT_CONFIG_VALUE_0=ok git config --get release.probe || true)
           if [ "${probe}" != "ok" ]; then
@@ -113,10 +108,9 @@ jobs:
             GOOS=darwin GOARCH=arm64 go build -o dist/cairnlint-darwin-arm64 .
           '
 
-      - name: Create GitHub release
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          gh release create "${TAG}" --verify-tag --generate-notes dist/*
+      - name: Create GitHub release # zizmor: ignore[superfluous-actions] runner host has no gh and jobs install nothing on it
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: dist/*
