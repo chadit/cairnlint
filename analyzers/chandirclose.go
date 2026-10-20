@@ -92,14 +92,8 @@ func isBidirectionalChanParam(expr ast.Expr, info *types.Info) bool {
 		return false
 	}
 
-	// Parameters live in a function scope whose parent is the package scope.
-	// Local variables also live in function scopes (or nested block scopes),
-	// but we distinguish params by checking that the variable is declared in
-	// a scope whose parent is the package scope (function body scope), and
-	// the variable's position falls within the function signature, not the body.
-	// A simpler heuristic: v.IsField() is false and v.Parent() is a function scope.
-	// The types package does not expose "is parameter" directly, so we check
-	// whether the Var appears in the function's signature Params.
+	// The types package has no "is parameter" query, so match the variable
+	// against the enclosing function's signature.
 	if !isParamVar(varObj, info) {
 		return false
 	}

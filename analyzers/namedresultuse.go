@@ -10,12 +10,11 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// namedResultUseAnalyzer returns an analyzer that flags functions whose body
-// treats a named result as a working variable, either by assigning it or by
-// returning with a naked return. Names that only document the signature, the
-// way io.Reader spells Read(p []byte) (n int, err error), are left alone. So
-// is any function where a deferred closure assigns a result, because that is
-// the only way to propagate a Close error or a recovered panic to the caller.
+// namedResultUseAnalyzer returns an analyzer that flags functions that assign
+// a named result in the body or return bare. Names that only document the
+// signature, as in io.Reader's Read, are left alone, and so is a function
+// whose deferred closure assigns a result, since that is the only way to
+// propagate a Close error or recovered panic.
 func namedResultUseAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "namedresultuse",

@@ -14,22 +14,10 @@ import (
 const deepEqualArgCount = 2
 
 // reflectDeepEqualScalarAnalyzer returns an analyzer that flags
-// reflect.DeepEqual calls whose operands are scalars (numbers, strings,
-// bools). For identical scalar types the call is a slow spelling of ==:
-// DeepEqual leaks its any parameters, so each operand is boxed onto the
-// heap (two allocations per call for any value the runtime cannot
-// intern, meaning ints of 256 or more, floats, and non-empty strings),
-// and the reflection walk runs 8x to 25x slower than the single compare
-// instruction == compiles to.
-// For differing concrete types the call is always false, because
-// DeepEqual never equates values of distinct types, and == would have
-// refused to compile, so the reflection call hides a type mismatch the
-// compiler would otherwise have caught.
-//
-// Operands whose static type is an interface or a type parameter are
-// skipped: the runtime type is unknown, so DeepEqual may be the only
-// option (see sync/map_test.go and the recover() comparisons in
-// encoding/json).
+// reflect.DeepEqual calls on scalar operands. For identical types the call is
+// a slow ==, boxing each operand onto the heap. For differing types it is
+// always false, hiding a mismatch == would refuse to compile. Interface and
+// type-parameter operands are skipped, since their runtime type is unknown.
 func reflectDeepEqualScalarAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "reflectdeepequalscalar",

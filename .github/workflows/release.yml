@@ -13,16 +13,19 @@ on:
           - major
         default: patch
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
   validate:
     name: Validate
     runs-on: [self-hosted, linux, x64, cairnlint]
     timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Lint, test, build
         run: |
@@ -34,10 +37,15 @@ jobs:
     needs: validate
     runs-on: [self-hosted, linux, x64, cairnlint]
     timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
+      # No step after checkout needs the token except the tag push, which
+      # supplies its own.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Compute next version
         id: version
@@ -59,15 +67,39 @@ jobs:
           echo "tag=${next}" >> "$GITHUB_OUTPUT"
           echo "Previous: ${latest} -> Next: ${next} (${BUMP} bump)"
 
+      # The tag push and gh release both run after the tag exists, so a
+      # missing tool would orphan the tag. The probe tests GIT_CONFIG_COUNT
+      # itself, which needs git 2.31.
+      - name: Check release tooling
+        run: |
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "E: gh is not installed on this runner" >&2
+            exit 1
+          fi
+          gh --version
+          probe=$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=release.probe \
+            GIT_CONFIG_VALUE_0=ok git config --get release.probe || true)
+          if [ "${probe}" != "ok" ]; then
+            echo "E: $(git --version) lacks GIT_CONFIG_COUNT; need git 2.31+" >&2
+            exit 1
+          fi
+
       # The runner host's global git config supplies the identity and signs
       # tags with its GPG key, so no bot identity is set here: an email with no
       # matching secret key makes the signed tag fail.
+      # The token goes through GIT_CONFIG_* env so it stays out of argv and
+      # out of any config file on the runner host.
       - name: Create tag
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           git tag -a "${TAG}" -m "Release ${TAG}"
-          git push origin "${TAG}"
+          auth=$(printf 'x-access-token:%s' "${GH_TOKEN}" | base64 | tr -d '\n')
+          GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}" \
+            git push origin "${TAG}"
 
       # Cross-compiles in the container so the release binaries come from the
       # same pinned-to-latest toolchain the gate used.
@@ -82,8 +114,9 @@ jobs:
           '
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
-          files: dist/*
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${TAG}" --verify-tag --generate-notes dist/*

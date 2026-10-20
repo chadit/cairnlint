@@ -87,7 +87,13 @@ func isStringPlusAssign(assign *ast.AssignStmt, info *types.Info) bool {
 	lhsIdent, lhsIsIdent := assign.Lhs[0].(*ast.Ident)
 	rhsIdent, rhsIsIdent := binExpr.X.(*ast.Ident)
 
-	return lhsIsIdent && rhsIsIdent && lhsIdent.Obj == rhsIdent.Obj
+	if !lhsIsIdent || !rhsIsIdent {
+		return false
+	}
+
+	lhsObj := info.ObjectOf(lhsIdent)
+
+	return lhsObj != nil && lhsObj == info.ObjectOf(rhsIdent)
 }
 
 // isStringType reports whether expr has an underlying string type.

@@ -119,13 +119,9 @@ func extractPeekSliceValues(call *ssa.Call) []ssa.Value {
 	return sliceVals
 }
 
-// peekSliceUsedAfterMutation checks whether any of the slice values derived
-// from a Peek call are referenced after a mutation to the same buffer.
-//
-// Strategy: for each basic block containing a mutation of the same buffer
-// receiver, check whether that mutation dominates any block where the slice
-// value is used, or whether mutation and use are in the same block with the
-// mutation appearing first.
+// peekSliceUsedAfterMutation reports whether a slice derived from a Peek call
+// is used after a mutation of the same buffer: the mutating block dominates a
+// block using the slice, or both share a block with the mutation first.
 func peekSliceUsedAfterMutation(peekCall *ssa.Call, receiver ssa.Value, sliceVals []ssa.Value) bool {
 	fn := peekCall.Parent()
 

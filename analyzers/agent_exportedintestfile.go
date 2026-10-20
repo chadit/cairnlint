@@ -8,15 +8,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// agentExportedInTestFileAnalyzer flags exported declarations in augmented
-// _test.go files (same-package, using package foo instead of package foo_test).
-// These add symbols to the package API surface solely during compilation,
-// which usually means they exist only for verification access.
-//
-// This is an agent-only analyzer because legitimate patterns exist (e.g.
-// framework entry points, Example functions) and some exported helpers are
-// intentional. An LLM can grep for usage and decide; a human would get
-// tired of dismissing false positives.
+// agentExportedInTestFileAnalyzer flags exported declarations in same-package
+// _test.go files. They widen the package API only under test, which usually
+// means they exist to reach internals. It is agent-only because Example
+// functions, framework entry points, and some helpers are intentional, and an
+// LLM can check usage where a human would tire of the false positives.
 func agentExportedInTestFileAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentexportedintestfile",

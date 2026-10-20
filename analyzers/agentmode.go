@@ -61,15 +61,10 @@ func DetectAgentCaller() bool {
 	return false
 }
 
-// AgentOnly returns analyzers that are only enabled in agent mode. These
-// produce heuristic-based diagnostics with a higher false-positive rate
-// than the standard set. LLM agents can triage them; humans would find
-// the noise annoying.
-//
-// Diagnostic messages from these analyzers are prefixed with [agent] so
-// they're easy to filter and identify in output.
-// Suggested fixes are stripped for the same reason as in [All]: no analyzer
-// leaving this package may carry an edit a driver could apply.
+// AgentOnly returns the heuristic analyzers enabled only in agent mode. Their
+// false-positive rate suits an LLM that triages findings but would bury a
+// human in noise, and their messages carry an [agent] prefix for filtering.
+// Suggested fixes are stripped for the same reason as in [All].
 func AgentOnly() []*analysis.Analyzer {
 	return WrapWithoutFixes([]*analysis.Analyzer{
 		agentExportedInTestFileAnalyzer(),

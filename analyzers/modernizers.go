@@ -7,15 +7,12 @@ import (
 	"golang.org/x/tools/go/analysis/passes/modernize"
 )
 
-// supersededModernizers are upstream analyzers cairnlint deliberately does not
-// register, because a cairnlint rule already covers the same ground and would
-// report the same line twice with different wording.
+// supersededModernizers are upstream analyzers cairnlint does not register,
+// because a cairnlint rule already reports the same line with other wording:
 //
-//   - errorsastype: cairnlint's prefererrorsastype flags every errors.As call.
-//     Upstream fires only where the var declaration has the exact rewritable
-//     shape, so it is the narrower of the two.
-//   - stringsbuilder: cairnlint's stringconcatinloop covers the same += loop.
-//   - testingcontext: cairnlint's contextbackground, contexttodo, and
+//   - errorsastype: prefererrorsastype flags every errors.As call, a superset.
+//   - stringsbuilder: stringconcatinloop covers the same += loop.
+//   - testingcontext: contextbackground, contexttodo, and
 //     wrappedcontextbackground already push tests toward t.Context().
 var supersededModernizers = []string{ //nolint:gochecknoglobals // package-internal lookup table
 	"errorsastype",
@@ -24,16 +21,10 @@ var supersededModernizers = []string{ //nolint:gochecknoglobals // package-inter
 }
 
 // modernizeAnalyzers returns the upstream modernize suite minus the analyzers
-// cairnlint already covers.
-//
-// These come from golang.org/x/tools, the same suite `go fix` runs, so the
-// rules stay current without cairnlint tracking each Go release by hand. Their
-// suggested fixes are stripped before any diagnostic reaches the driver; see
-// [WrapWithoutFixes].
-//
-// Two upstream analyzers are absent from Suite by upstream's own choice, and
-// cairnlint keeps its own versions of both: bloop (see [preferBLoopAnalyzer])
-// and fmtappendf (see [preferFmtAppendfAnalyzer]).
+// cairnlint already covers. Taking the suite `go fix` runs keeps the rules
+// current without tracking each Go release by hand, and [WrapWithoutFixes]
+// strips their fixes. Upstream leaves bloop and fmtappendf out of Suite, so
+// cairnlint keeps [preferBLoopAnalyzer] and [preferFmtAppendfAnalyzer].
 func modernizeAnalyzers() []*analysis.Analyzer {
 	out := make([]*analysis.Analyzer, 0, len(modernize.Suite))
 

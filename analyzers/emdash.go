@@ -9,7 +9,7 @@ import (
 // emDashChar is the Unicode em dash (U+2014). Writing style rules forbid
 // it in text: replace with a comma for a continuing thought or a period
 // for a separate sentence.
-const emDashChar = "—"
+const emDashChar = "\u2014"
 
 // emdashAnalyzer returns an analyzer that flags em dashes in comment text.
 // Em dashes are a recognized AI-writing tell and project style rules

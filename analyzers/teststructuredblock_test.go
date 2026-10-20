@@ -6,9 +6,9 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-// TestTestStructuredBlock verifies the teststructuredblock analyzer flags
-// the structured section headers (Workflow, Test Environment, Expected
-// Behavior, Purpose, Simulates) in test function doc comments.
+// TestTestStructuredBlock verifies the teststructuredblock analyzer reports
+// the listed section headers in test doc comments, in bold and lowercase
+// forms, and leaves code-block samples and TestMain alone.
 func TestTestStructuredBlock(t *testing.T) {
 	t.Parallel()
 

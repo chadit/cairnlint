@@ -8,7 +8,7 @@ import (
 
 // testCryptoInProdAnalyzer returns an analyzer that flags imports of test-only
 // crypto packages in non-test files. Packages like crypto/mlkem/mlkemtest and
-// testing/cryptotest provide deterministic crypto for testing and must never
+// testing/cryptotest provide seeded, repeatable crypto for tests and must never
 // appear in production code.
 func testCryptoInProdAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
@@ -19,7 +19,7 @@ func testCryptoInProdAnalyzer() *analysis.Analyzer {
 }
 
 // isTestOnlyCryptoPackage reports whether importPath is a package that provides
-// deterministic crypto primitives intended exclusively for test code.
+// seeded, repeatable crypto primitives meant only for test code.
 func isTestOnlyCryptoPackage(importPath string) bool {
 	switch importPath {
 	case "crypto/mlkem/mlkemtest", "testing/cryptotest":

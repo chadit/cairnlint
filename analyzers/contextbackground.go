@@ -2,15 +2,11 @@ package analyzers
 
 import "golang.org/x/tools/go/analysis"
 
-// contextBackgroundAnalyzer returns an analyzer that flags
-// context.Background() in test files. Tests should use t.Context()
-// which is canceled when the test ends, preventing goroutine leaks.
-//
-// t.Context() arrived in Go 1.24, so the rule is gated on that version and
-// stays quiet where no testing value can supply one or where it is already
-// canceled; see testCallConfig.suggestsTContext. A Background() that is the
-// base of a context.With* call is left to wrappedcontextbackground, which
-// reports that line with the more specific message.
+// contextBackgroundAnalyzer flags context.Background() in test files, where
+// t.Context() is canceled when the test ends and so prevents goroutine leaks.
+// It needs Go 1.24 and stays quiet where t.Context() is unavailable or already
+// canceled (see testCallConfig.suggestsTContext). A Background() that bases a
+// context.With* call is left to wrappedcontextbackground's sharper message.
 func contextBackgroundAnalyzer() *analysis.Analyzer {
 	return testCallAnalyzer(&testCallConfig{
 		name:             "contextbackground",

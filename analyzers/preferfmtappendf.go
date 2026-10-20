@@ -18,14 +18,10 @@ const writeMethodName = "Write"
 const writeResultCount = 2
 
 // preferFmtAppendfAnalyzer returns an analyzer that flags []byte(fmt.Sprintf(...))
-// conversions. fmt.Appendf(nil, ...) writes directly into a byte slice and
-// avoids the intermediate string allocation that the conversion requires.
-//
-// The replacement depends on where the conversion lands. Feeding the result
-// straight into a Write call should become fmt.Fprintf, which skips the byte
-// slice as well as the string. Suggesting Appendf everywhere was the objection
-// that got the upstream fmtappendf modernizer pulled from `go fix` in Go 1.27
-// (golang/go#77581), so the diagnostic names whichever replacement fits.
+// conversions, which allocate an intermediate string. A result fed straight to
+// Write should become fmt.Fprintf rather than fmt.Appendf, so the diagnostic
+// names whichever fits. Suggesting Appendf everywhere got the upstream
+// modernizer pulled (golang/go#77581).
 func preferFmtAppendfAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "preferfmtappendf",

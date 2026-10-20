@@ -14,14 +14,10 @@ import (
 var httptestRealServerCtors = []string{"NewServer", "NewTLSServer", "NewUnstartedServer"} //nolint:gochecknoglobals // package-internal lookup table
 
 // synctestRealServerAnalyzer returns an analyzer that flags real httptest
-// servers created inside a synctest.Test closure. Go 1.27 added
-// httptest.NewTestServer, which is backed by an in-memory network built for
-// synctest.
-//
-// A real listener puts the socket outside the bubble, so a goroutine waiting on
-// it never counts as durably blocked and synctest.Wait can hang or return
-// early. The failure shows up as a flaky test far from this line, which is why
-// it is worth flagging at the constructor.
+// servers created inside a synctest.Test closure, where Go 1.27's
+// httptest.NewTestServer belongs. A real listener sits outside the bubble, so
+// a goroutine waiting on it never counts as durably blocked and synctest.Wait
+// can hang or return early, which surfaces as a flaky test far from here.
 func synctestRealServerAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "synctestrealserver",

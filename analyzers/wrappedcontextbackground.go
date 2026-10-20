@@ -7,13 +7,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// wrappedContextBackgroundAnalyzer returns an analyzer that flags the context
-// derivation functions wrapping context.Background() in test files. Even
-// wrapped, the base context should be t.Context() so it is canceled at the
-// end of the test. WithoutCancel is left out because its result is never
-// canceled whatever the base; contextbackground still reports the inner
-// call. The gate and scope rules match contextbackground, since the advice
-// is the same.
+// wrappedContextBackgroundAnalyzer returns an analyzer that flags context
+// derivation functions wrapping context.Background() in test files, whose base
+// should be t.Context() so it is canceled when the test ends. WithoutCancel is
+// skipped because its result is never canceled. Gate and scope rules match
+// contextbackground.
 func wrappedContextBackgroundAnalyzer() *analysis.Analyzer {
 	return testCallAnalyzer(&testCallConfig{
 		name:             "wrappedcontextbackground",

@@ -4,7 +4,7 @@ GO ?= go
 GOFLAGS_TEST ?= -v -race -count=1
 
 .DEFAULT_GOAL := help
-.PHONY: help test test-fast build install lint vet tidy clean
+.PHONY: help test test-fast build install lint vet tidy update-deps clean
 
 help: ## List available targets
 	@awk 'BEGIN { FS = ":.*##"; printf "cairnlint targets:\n" } \
@@ -31,6 +31,11 @@ vet: ## go vet ./...
 
 tidy: ## go mod tidy
 	$(GO) mod tidy
+
+# pinact runs as a one-shot so nothing is installed; the token keeps it under the API rate limit.
+update-deps: ## Move Go modules, the go directive, and action pins to the newest release
+	$(GO) get -u -t ./... && $(GO) get go@latest && $(GO) mod tidy
+	GITHUB_TOKEN="$$(gh auth token)" $(GO) run github.com/suzuki-shunsuke/pinact/v3/cmd/pinact@latest run --update
 
 clean: ## Remove the local binary and the go test cache
 	$(GO) clean -testcache

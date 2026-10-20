@@ -24,11 +24,9 @@ const (
 // goVersionAtLeast reports whether the Go language version in force for the
 // file containing pos is want or newer.
 //
-// Analyzers that recommend a standard library API must gate on this. Naming an
-// API the caller's language version does not have is worse than staying quiet:
-// Go 1.27 runs the stdversion vet check as part of `go test` by default, so
-// acting on an ungated suggestion converts a lint hint into a vet failure on
-// every subsequent test run.
+// Analyzers that recommend a standard library API must gate on this. Go 1.27
+// runs the stdversion vet check during `go test`, so acting on an ungated
+// suggestion turns a lint hint into a vet failure on every test run.
 func goVersionAtLeast(pass *analysis.Pass, pos token.Pos, want string) bool {
 	return versionAtLeast(effectiveGoVersion(pass, pos), want)
 }

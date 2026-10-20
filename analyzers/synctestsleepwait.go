@@ -9,14 +9,9 @@ import (
 )
 
 // synctestSleepWaitAnalyzer returns an analyzer that flags a time.Sleep call
-// immediately followed by synctest.Wait. Go 1.27 added synctest.Sleep, which
-// performs both steps.
-//
-// Keeping the two calls together matters: Sleep advances the bubble's clock and
-// Wait blocks until every other goroutine in the bubble is durably blocked. A
-// later edit that inserts a statement between them, or drops the Wait, changes
-// what the test synchronizes on without any signal. The single call cannot come
-// apart that way.
+// followed directly by synctest.Wait, which Go 1.27's synctest.Sleep combines.
+// As two calls, a later edit can insert a statement between them or drop the
+// Wait, changing what the test synchronizes on with no signal.
 func synctestSleepWaitAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "synctestsleepwait",

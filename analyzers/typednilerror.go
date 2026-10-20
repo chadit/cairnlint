@@ -80,16 +80,13 @@ func checkFunctionForTypedNilError(pass *analysis.Pass, ssaFunc *ssa.Function) {
 	}
 }
 
-// checkReturnOperand examines a single returned SSA value. In SSA, returning a
-// typed nil as error becomes:
+// checkReturnOperand reports a returned SSA value that is a MakeInterface of
+// a nil pointer constant, which is how SSA spells a typed nil returned as error:
 //
 //	t0 = make interface error <- *MyError (nil:*MyError)
-//	return t0
 //
-// We look for MakeInterface whose underlying operand (X) is a pointer type and
-// is a nil constant. The retPos parameter provides a fallback source position
-// from the return statement, since synthetic MakeInterface instructions often
-// lack a source position.
+// retPos is the fallback position, since synthetic MakeInterface
+// instructions often lack one.
 func checkReturnOperand(pass *analysis.Pass, val ssa.Value, retPos token.Pos) {
 	makeIface, isMakeInterface := val.(*ssa.MakeInterface)
 	if !isMakeInterface {

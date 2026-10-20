@@ -104,7 +104,7 @@ func runBuilderGrow(pass *analysis.Pass, minRangeLen int) (any, error) {
 
 		// For range loops over small literal sources, skip the diagnostic.
 		if rangeLoop, isRange := loopNode.(*ast.RangeStmt); isRange {
-			if litLen := rangeSourceLiteralLen(rangeLoop.X); litLen >= 0 && litLen < minRangeLen {
+			if litLen := rangeSourceLiteralLen(pass, rangeLoop.X); litLen >= 0 && litLen < minRangeLen {
 				return true
 			}
 		}

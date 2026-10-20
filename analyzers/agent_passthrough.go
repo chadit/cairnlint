@@ -22,14 +22,10 @@ type receiverMethods struct {
 }
 
 // agentPassthroughAnalyzer flags methods that only forward their arguments to
-// another value, and types whose every method does so. A forwarding method
-// adds a name and a call hop; the caller could hold the wrapped value instead.
-// Fowler calls the type-level shape a Middle Man.
-//
-// It is agent-only because thin forwarding is sometimes the point: an adapter
-// at a package boundary, a method promoted to satisfy an external interface, or
-// a facade that deliberately narrows a wide type. The analyzer cannot see the
-// caller's reason, so it reports the shape and an LLM decides.
+// another value, and types whose every method does so (Fowler's Middle Man).
+// It is agent-only because forwarding is sometimes the point, as in a boundary
+// adapter, a method satisfying an external interface, or a facade narrowing a
+// wide type, and only an LLM can weigh the caller's reason.
 func agentPassthroughAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentpassthrough",

@@ -12,15 +12,10 @@ import (
 )
 
 // RunAutoTagsPasses re-executes the cairnlint binary once per user-defined
-// build tag discovered under passArgs' patterns, plus a default-build
-// pass with no -tags. Output lines are deduped across passes so callers
-// see every unique diagnostic exactly once regardless of which build
-// configuration surfaced it. Returns the worst exit code observed so the
-// overall invocation fails if any pass reports issues.
-//
-// Using a subprocess rather than calling multichecker.Main in-process
-// avoids the global-flag and os.Exit coupling inside the multichecker
-// driver; each pass gets a clean process environment.
+// build tag found under passArgs' patterns, plus one pass with no -tags. It
+// dedupes output lines across passes and returns the worst exit code. A
+// subprocess per pass avoids the global flags and os.Exit inside the
+// multichecker driver.
 func RunAutoTagsPasses(ctx context.Context, stdout, stderr io.Writer, executable string, passArgs []string) int {
 	patterns := patternsFromArgs(passArgs)
 

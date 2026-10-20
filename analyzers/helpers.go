@@ -73,11 +73,10 @@ type testCallConfig struct {
 	skipWhenArgOf []callMatcher
 
 	// suggestsTContext marks a message that names t.Context(). The call is
-	// then skipped below Go 1.24, where the method does not exist, inside
-	// TestMain and Example functions, which have no testing value to call it
-	// on, and inside any body that runs as a Cleanup callback, where
-	// t.Context() is already canceled. Any other function in a test file
-	// stays in scope: a helper without a testing parameter can take one.
+	// skipped below Go 1.24, where the method does not exist, in TestMain and
+	// Example functions, which have no testing value, and in Cleanup callbacks,
+	// where t.Context() is already canceled. Other test-file functions stay in
+	// scope, since a helper can take a testing parameter.
 	suggestsTContext bool
 }
 

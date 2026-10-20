@@ -51,15 +51,11 @@ func (writer *agentFileWriter) filePath() string {
 	return writer.path
 }
 
-// wrapAgentFileOutput wraps agent analyzers to redirect their diagnostics
-// to a temp file. Diagnostics are suppressed from stdout. A single summary
-// line is printed to stderr on the first finding so the caller (human or
-// LLM) knows where to look.
-//
-// When the file cannot be created, diagnostics pass through to stdout as
-// a fallback. The writer replaces pass.Report and never forwards to it, so
-// this must stay the outermost wrapper; WrapForAgentFile is the public way
-// in and composes it correctly.
+// wrapAgentFileOutput redirects agent diagnostics to a temp file and prints
+// one stderr line on the first finding so the caller knows where to look. If
+// the file cannot be created, diagnostics fall back to stdout. It replaces
+// pass.Report without forwarding, so it must be the outermost wrapper; enter
+// through WrapForAgentFile.
 func wrapAgentFileOutput(all []*analysis.Analyzer) []*analysis.Analyzer {
 	writer := newAgentFileWriter()
 
@@ -72,11 +68,9 @@ func wrapAgentFileOutput(all []*analysis.Analyzer) []*analysis.Analyzer {
 }
 
 // WrapForAgentFile routes diagnostics from all to the agent file after the
-// suppression and generated-file filters have run. The file writer replaces
-// pass.Report outright and never calls the Report it was handed, so it has
-// to be the outermost wrapper: wrapped the other way round, neither filter
-// ever saw an agent diagnostic and a //nolint directive had no effect on the
-// agent tier.
+// suppression and generated-file filters run. The file writer never calls the
+// Report it replaces, so it must wrap outermost: the other way round, neither
+// filter sees an agent diagnostic and //nolint has no effect on the agent tier.
 func WrapForAgentFile(all []*analysis.Analyzer) []*analysis.Analyzer {
 	return wrapAgentFileOutput(WrapWithNolint(WrapSkipGenerated(all)))
 }

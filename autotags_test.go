@@ -115,8 +115,6 @@ func TestDiscoverBuildTagsHandlesTrailingWildcard(t *testing.T) {
 // /bin/echo to confirm duplicate lines collapse and per-pass headers
 // still print. Using a stub executable sidesteps the need to rebuild
 // cairnlint itself for the test.
-//
-//nolint:paralleltest // calls t.Chdir, which forbids parallel
 func TestRunAutoTagsPassesMergesOutput(t *testing.T) {
 	if _, err := os.Stat("/bin/echo"); err != nil {
 		t.Skip("/bin/echo unavailable on this platform")

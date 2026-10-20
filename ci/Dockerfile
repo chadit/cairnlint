@@ -6,6 +6,9 @@
 # toolchain is governed by go.mod, not this tag
 FROM docker.io/library/golang:alpine
 
+# droast ignore=DF011 reason="CI toolchain image: it runs the build, so there is no runtime stage to split out" expires=2027-10-20
+# droast ignore=DF012 reason="CI toolchain image runs one command per container and exits, with no service to probe" expires=2027-10-20
+
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
 ENV GOPATH=/cache/go \

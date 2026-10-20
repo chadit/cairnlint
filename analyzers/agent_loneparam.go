@@ -19,15 +19,10 @@ type calleeUsage struct {
 }
 
 // agentLoneParamAnalyzer flags a parameter that receives the same constant at
-// every call site in the package. A parameter with one value is a knob nothing
-// turns: the branch it selects never varies, so the parameter, the argument at
-// each call site, and the unreachable half of the body all come out together.
-//
-// It is agent-only because the count is package-scoped and the guards are
-// heuristic. Only unexported callees are considered, since an exported one can
-// be called from anywhere, and a callee whose name is ever used outside a call
-// is skipped because its arguments are then invisible. An LLM confirms the
-// value never varies before acting.
+// every call site in the package. The branch it selects never varies, so the
+// parameter and the dead half of the body can go. It is agent-only because the
+// count is package-scoped: exported callees and callees used outside a call are
+// skipped, and an LLM confirms the value never varies.
 func agentLoneParamAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentloneparam",

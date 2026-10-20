@@ -15,15 +15,10 @@ const (
 	urlURLType    = "URL"
 )
 
-// urlCloneAnalyzer returns an analyzer that flags copies of net/url values
-// that share state with the original. Go 1.27 added URL.Clone and
-// Values.Clone, which copy all the way down.
-//
-// Both shapes look finished and are not. maps.Clone on url.Values duplicates
-// the map while every []string value stays shared, so appending to a copied
-// key mutates the original. Dereferencing a *url.URL copies the struct while
-// the *Userinfo pointer stays shared. Neither aliasing bug shows up until
-// something writes through the copy.
+// urlCloneAnalyzer returns an analyzer that flags shallow copies of net/url
+// values, which Go 1.27's URL.Clone and Values.Clone replace. maps.Clone on
+// url.Values shares every []string, and dereferencing a *url.URL shares the
+// *Userinfo, so a write through the copy changes the original.
 func urlCloneAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "urlclone",

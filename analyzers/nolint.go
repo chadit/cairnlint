@@ -12,13 +12,10 @@ import (
 )
 
 // suppressPattern matches a nolint directive at the start of a line comment,
-// following golangci-lint: after `//` and optional spaces the word `nolint`
-// must be followed by a colon, whitespace, or the end of the comment, so
-// `//nolintfoo`, `//nolint-foo`, and `nolint` mentioned mid-sentence are not
-// directives. The name list after the colon runs to the next `//`, which is
-// how golangci-lint separates the list from its explanation, so
-// `//nolint:a/b, c // why` yields `a/b, c`. The capture keeps the colon so an
-// explicit empty list (`//nolint:`) can be told apart from a bare `//nolint`.
+// following golangci-lint: `nolint` must be followed by a colon, whitespace,
+// or the end, so `//nolintfoo` is not a directive. The name list runs to the
+// next `//`, golangci-lint's separator before the explanation. The capture
+// keeps the colon so an empty `//nolint:` differs from a bare `//nolint`.
 var suppressPattern = regexp.MustCompile(`^//\s*nolint(?:(:(?:[^/]|/[^/])*)|\s|$)`)
 
 // suppressAllName is golangci-lint's wildcard name that suppresses every analyzer.
@@ -73,11 +70,10 @@ func wrapAnalyzer(orig *analysis.Analyzer) *analysis.Analyzer {
 }
 
 // directive is one parsed //nolint comment plus the line range it suppresses.
-// names holds the lowercased analyzer names from `//nolint:a,b,c`; all is set
-// for a bare `//nolint` or `//nolint:all`. filename is the position-adjusted
-// name, so a //line directive moves the suppression along with the
-// diagnostics it covers. filename leads names because govet's fieldalignment
-// wants the pointer-bearing bytes packed at the front.
+// names holds lowercased analyzer names, and all is set for a bare `//nolint`
+// or `//nolint:all`. filename is position-adjusted, so a //line directive
+// moves the suppression with its diagnostics. filename leads names to satisfy
+// govet's fieldalignment.
 type directive struct {
 	filename  string
 	names     []string

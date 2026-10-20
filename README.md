@@ -585,7 +585,7 @@ confirm.
 | `emdash` | Em dash (U+2014) in comments |
 | `docparamblock` | Javadoc `Parameters:`/`Returns:` blocks in doc comments |
 | `doctutorialvoice` | Tutorial voice (`Lets you`, `Use this to`, `Here we`) |
-| `teststructuredblock` | `Workflow:`/`Purpose:`/etc. in test doc comments |
+| `teststructuredblock` | `Workflow:`/`Purpose:`/etc. in test doc comments, except `TestMain` |
 
 ### Modernizers (golang.org/x/tools, report-only)
 

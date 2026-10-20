@@ -7,14 +7,9 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// aiBuzzwordPatterns groups the writing-style rule's forbidden vocabulary
-// into categories so the diagnostic message points the reader at which
-// rule section to revisit. Patterns are case-insensitive and use word
-// boundaries on single-word entries to avoid matching substrings.
-//
-// Each pattern stays ASCII-only on the left-hand side because Go source
-// comments routinely contain ASCII text; the right-hand side is the
-// human-facing category name used in the diagnostic.
+// aiBuzzwordPatterns groups the writing-style rule's forbidden vocabulary by
+// category so the diagnostic names the rule section. Single-word patterns use
+// word boundaries to avoid matching inside longer words.
 //
 // The pointer field leads so the garbage collector stops scanning after the
 // string header, which is the ordering govet's fieldalignment check wants.

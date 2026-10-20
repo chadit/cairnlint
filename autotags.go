@@ -16,14 +16,11 @@ import (
 // Exported so lint.sh and other drivers can reference the constant name.
 const AutoTagsSentinel = "auto"
 
-// reservedBuildTags lists identifiers that appear in //go:build lines but
-// are NOT user-defined tags. GOOS/GOARCH values are already selected by the
-// toolchain based on environment; forcing them via -tags would not enable
-// cross-platform files (the go/build constraint system checks GOOS/GOARCH
-// independently) but would pollute the discovered set. Compiler and
-// feature identifiers (cgo, race, ...) likewise come from build mode, not
-// from -tags. "ignore" is a conventional marker for files intentionally
-// excluded from every build.
+// reservedBuildTags lists identifiers in //go:build lines that are not
+// user-defined tags. GOOS and GOARCH values and compiler or feature names such
+// as cgo and race come from the environment and build mode. Forcing them via
+// -tags would enable files for the wrong platform or build mode and pollute
+// the discovered set. "ignore" marks files excluded from every build.
 var reservedBuildTags = map[string]struct{}{ //nolint:gochecknoglobals // immutable lookup table, not runtime state
 	// GOOS values recognized by go/build as of Go 1.22.
 	"aix": {}, "android": {}, "darwin": {}, "dragonfly": {},

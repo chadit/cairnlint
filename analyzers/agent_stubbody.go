@@ -19,11 +19,10 @@ var notImplementedRe = regexp.MustCompile(`(?i)\b(not[ _-]?implemented|unimpleme
 // reused here to spot canned error constructions by their result type.
 
 // agentStubBodyAnalyzer flags functions whose body does nothing their name or
-// doc claims: an empty body under a descriptive doc, a lone return of a canned
-// value, or an explicit "not implemented" sentinel. These compile and pass the
-// standard linters, so only a reader catches that the work is missing. It is
-// agent-only because legitimate no-ops exist (interface satisfiers, null
-// objects) and the heuristic cannot tell them from a stub.
+// doc claims: an empty body, a lone canned return, or a "not implemented"
+// sentinel. These pass the standard linters. It is agent-only because
+// interface satisfiers and null objects are legitimate no-ops the heuristic
+// cannot tell apart from a stub.
 func agentStubBodyAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentstubbody",

@@ -15,12 +15,9 @@ import (
 const lastIndexFunc = "LastIndex"
 
 // preferCutLastAnalyzer returns an analyzer that flags a LastIndex result used
-// to slice the same operand. Go 1.27 added strings.CutLast and bytes.CutLast,
-// which return the two halves and a found flag in one call.
-//
-// The manual form has to get the offset arithmetic right by hand: the tail
-// starts at idx+len(sep), and forgetting the separator length silently leaves
-// it on the front of the result. CutLast removes that arithmetic entirely.
+// to slice the same operand, which Go 1.27's strings.CutLast and bytes.CutLast
+// replace. The manual tail starts at idx+len(sep), and dropping the separator
+// length leaves it on the front of the result with no error.
 func preferCutLastAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "prefercutlast",

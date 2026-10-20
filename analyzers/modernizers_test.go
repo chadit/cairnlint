@@ -23,13 +23,10 @@ func supersededByCairnlint() map[string]string {
 }
 
 // TestSupersededModernizersStillExistUpstream guards the exclusion list against
-// a golang.org/x/tools bump.
-//
-// The list matches upstream analyzers by name. If upstream renames or drops
-// one, the exclusion stops matching, the analyzer quietly registers again, and
-// every finding it shares with the native rule gets reported twice. That change
-// compiles and passes every other test, so with dependency updates merging
-// themselves it would otherwise reach main unnoticed.
+// a golang.org/x/tools bump that renames or drops an analyzer, which would
+// register it again and report every shared finding twice. That change compiles
+// and passes every other test, so a self-merging dependency update would reach
+// main unnoticed.
 func TestSupersededModernizersStillExistUpstream(t *testing.T) {
 	t.Parallel()
 

@@ -20,23 +20,11 @@ const (
 	benchStartTimer = "StartTimer"
 )
 
-// preferBLoopAnalyzer returns an analyzer that flags old-style benchmark loops
-// using b.N in test files. Go 1.24 introduced b.Loop() which handles
-// iteration counting, timer resets, and prevents compiler dead-code
-// elimination automatically.
-//
-// Benchmarks that drive the timer by hand are left alone. b.Loop keeps its own
-// timing window, so rewriting a loop whose enclosing function calls
-// b.StopTimer or b.StartTimer changes what the benchmark measures and can hang
-// it outright (golang/go#74967). Upstream disabled its own bloop modernizer
-// over this; the rule is sound, the blanket rewrite was not.
-//
-// A benchmark that reads b.N anywhere other than the one loop condition is
-// also left alone, as upstream's usesBenchmarkNOnce does. Under b.Loop the
-// runner sets b.N to 1 and then 0, so a slice sized by b.N is indexed out of
-// range and a second b.N loop fails with "B.Loop called with timer stopped".
-// For the same reason a loop inside a closure that captures an outer b is
-// skipped: the outer body may size data by b.N where the closure cannot see.
+// preferBLoopAnalyzer returns an analyzer that flags b.N benchmark loops that
+// could use b.Loop in test files. It skips benchmarks that call b.StopTimer
+// or b.StartTimer, because b.Loop keeps its own timing window and the rewrite
+// can hang them (golang/go#74967), and benchmarks that read b.N outside the
+// loop condition, since b.Loop sets b.N to 1 and then 0.
 func preferBLoopAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "preferbloop",
@@ -134,16 +122,11 @@ func isBNSelector(expr ast.Expr, info *types.Info) bool {
 	return isTestingBExpr(sel.X, info)
 }
 
-// convertibleToBLoop reports whether the b.N loop on node can become b.Loop.
-// The loop's b must be a parameter of the innermost enclosing function, that
-// function must not drive the timer by hand, and b.N must appear nowhere
-// else in its body.
-//
-// Innermost is the right scope because each b.Run sub-benchmark receives its
-// own *testing.B: timer calls and b.N reads in an outer benchmark say nothing
-// about a loop inside a sub-benchmark closure. Requiring b to be that
-// function's own parameter is what tells a sub-benchmark apart from a
-// closure that captures the outer b.
+// convertibleToBLoop reports whether the b.N loop on node can become b.Loop:
+// b must be a parameter of the innermost enclosing function, which must not
+// touch the timer or read b.N elsewhere. Innermost scope works because each
+// b.Run sub-benchmark gets its own *testing.B, and the parameter check tells a
+// sub-benchmark apart from a closure capturing the outer b.
 func convertibleToBLoop(node ast.Node, stack []ast.Node, info *types.Info) bool {
 	funcType, body := enclosingFunc(stack)
 	if body == nil {

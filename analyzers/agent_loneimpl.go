@@ -18,15 +18,10 @@ type declaredInterface struct {
 }
 
 // agentLoneImplAnalyzer flags an interface that exactly one type in the same
-// package implements. An interface written for one implementation carries a
-// generality nothing uses: the concrete type can go straight into the
-// signature, which removes the interface, any compile-time assertion, and the
-// indirection at every call site.
-//
-// It is agent-only because the count is package-scoped. An implementation in
-// another package, or an external caller supplying its own, is invisible from
-// here, so the diagnostic states the scope it counted and an LLM searches the
-// module before acting on it.
+// package implements. The concrete type can go straight into the signature,
+// removing the interface and its call-site indirection. It is agent-only
+// because the count is package-scoped: an implementation in another package is
+// invisible here, so an LLM searches the module before acting.
 func agentLoneImplAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentloneimpl",
@@ -49,12 +44,11 @@ func runAgentLoneImpl(pass *analysis.Pass) (any, error) {
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 }
 
-// skipUncountablePass drops the passes whose count would be wrong or
-// duplicated, for every analyzer here that counts uses within a package.
-// An external test package declares no production symbols worth counting.
-// The plain variant of a package carrying _test.go files is skipped because
-// the augmented variant of that same package also sees the test files, and
-// what they declare or call is part of the count.
+// skipUncountablePass drops passes whose per-package use count would be wrong
+// or duplicated. An external test package declares nothing worth counting. The
+// plain variant of a package with _test.go files is skipped because its
+// augmented variant also sees the test files, whose declarations and calls
+// belong in the count.
 func skipUncountablePass(pass *analysis.Pass) bool {
 	if pass.Pkg == nil || strings.HasSuffix(pass.Pkg.Name(), "_test") {
 		return true

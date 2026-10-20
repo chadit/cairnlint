@@ -94,14 +94,11 @@ func cachedIsGenerated(fset *token.FileSet, filename string, file *ast.File) boo
 	return generated
 }
 
-// isGenerated checks path conventions and then the standard header. When a
-// //line directive redirects the file's positions to another Go file, as
-// cmd/cgo output does, the header in the parsed file belongs to the
-// preprocessor and not to the source the user wrote, so the header check
-// moves to the //line target. Without that, every hand-written cgo file in
-// a package went silent. A redirect to a non-Go source, as goyacc output
-// does with its grammar, keeps the parsed file's own header: the Go file
-// is the generated artifact there.
+// isGenerated checks path conventions, then the standard header. When a
+// //line directive points at another Go file, as in cgo output, the parsed
+// header is the preprocessor's, so the check reads the target's header and
+// hand-written cgo files keep their diagnostics. A redirect to a non-Go
+// source, such as a goyacc grammar, keeps the parsed header.
 func isGenerated(fset *token.FileSet, filename string, file *ast.File) bool {
 	if strings.HasSuffix(filename, ".pb.go") || strings.Contains(filename, "/gen/") {
 		return true
@@ -128,12 +125,11 @@ func sourceHasGeneratedHeader(filename string, redirected *ast.File) bool {
 	return ast.IsGenerated(header)
 }
 
-// readHeader parses the package clause and the comments before it from the
-// regular file at filename, reading at most maxGeneratedHeaderBytes. The
-// file sits outside the pass's own file list, which is why pass.ReadFile
-// cannot serve it. It is opened through an os.Root pinned to its directory
-// so the //line name cannot walk anywhere else, and the regular-file check
-// keeps a //line pointing at a device or FIFO from blocking the run.
+// readHeader parses the package clause and leading comments of the regular
+// file at filename, reading at most maxGeneratedHeaderBytes. The file is
+// outside the pass's file list, so pass.ReadFile cannot serve it. An os.Root
+// pinned to its directory keeps the //line name from walking elsewhere, and
+// the regular-file check keeps a device or FIFO target from blocking the run.
 func readHeader(filename string) (*ast.File, bool) {
 	root, err := os.OpenRoot(filepath.Dir(filename))
 	if err != nil {

@@ -9,16 +9,10 @@ import (
 )
 
 // tickerLeakAnalyzer returns an analyzer that flags time.NewTicker and
-// time.NewTimer calls where the returned value is never stopped via defer,
-// in files whose language version is below Go 1.23. Before 1.23 the runtime
-// kept a reference to every unstopped timer, so a ticker was never collected
-// and a timer lived until it fired. Go 1.23 made unreferenced timers eligible
-// for collection whether or not Stop was called, and Go 1.27 removed the
-// asynctimerchan setting that could restore the old behavior, so from 1.23
-// on the rule has nothing to catch. The runtime keys that change on the main
-// module's go line and the toolchain; the file's language version stands in
-// for both here, so a //go:build tag below 1.23 inside a newer module still
-// gets a report.
+// time.NewTimer results never stopped via defer, in files below Go 1.23.
+// Before 1.23 the runtime held every unstopped timer, and from 1.23 they are
+// collected anyway. The runtime keys on the module's go line, but the file's
+// language version stands in, so a //go:build tag below 1.23 still reports.
 func tickerLeakAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "tickerleak",

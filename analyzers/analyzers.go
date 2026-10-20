@@ -138,12 +138,9 @@ func Categories() []Category {
 }
 
 // All returns every analyzer registered in cairnlint, with suggested fixes
-// stripped.
-//
-// The stripping happens here rather than at the call site because every
-// consumer has a driver that can apply fixes: the multichecker in main has
-// -fix, and golangci-lint has --fix for the module plugin in [plugin]. Doing
-// it once on the way out of this package means a new consumer cannot forget.
+// stripped. Both consumers can apply fixes, the multichecker through -fix and
+// golangci-lint through --fix for [plugin], so stripping once on the way out
+// of this package means a new consumer cannot forget.
 func All() []*analysis.Analyzer {
 	cats := Categories()
 

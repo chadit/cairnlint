@@ -9,13 +9,10 @@ import (
 )
 
 // cleanupScope is the set of function bodies in one package that run as
-// testing Cleanup callbacks. t.Context() is canceled just before Cleanup
-// functions run, so advice to use it must stay out of every body that runs
-// there: a literal passed straight to Cleanup, a literal bound to a local
-// that is later passed, a function or method passed by name, and every
-// function those bodies call, transitively. A function reached from Cleanup
-// may also run earlier in the test, but any t.Context() inside it would be
-// dead on the Cleanup path, so leaving it alone is right.
+// testing Cleanup callbacks, plus everything they call. t.Context() is
+// canceled before Cleanup runs, so advice to use it must stay out of these
+// bodies. A function also called earlier in the test still belongs, because a
+// t.Context() there would be dead on the Cleanup path.
 type cleanupScope struct {
 	lits  map[*ast.FuncLit]bool
 	funcs map[*types.Func]bool

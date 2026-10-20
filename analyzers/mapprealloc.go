@@ -9,21 +9,11 @@ import (
 	"golang.org/x/tools/go/ast/inspector"
 )
 
-// mapPreallocAnalyzer returns an analyzer that flags maps created without a
-// capacity hint that are then populated inside a range loop. Without
-// pre-allocation the runtime rehashes the map as it grows, wasting CPU and
-// memory.
-//
-// The hint has to be something the loop's own source can supply, so the
-// rule stays quiet when it cannot name one: a write nested inside a further
-// loop accumulates across the outer iterations, and a range over a function
-// iterator or a channel has no length at all. A range over an integer gets
-// that integer as the hint.
-//
-// The -min-range-len flag (default 8) suppresses diagnostics when the range
-// source is a literal with fewer than that many elements. Maps <= 8 entries
-// fit in one bucket and may be stack-allocated, so pre-allocation offers no
-// benefit and can force a heap allocation.
+// mapPreallocAnalyzer returns an analyzer that flags maps filled in a range
+// loop without a capacity hint, so the runtime rehashes as the map grows. It
+// stays quiet when the loop cannot supply a hint: a write in a nested loop,
+// or a range over an iterator or channel. Literals shorter than
+// -min-range-len are skipped, since small maps fit one bucket.
 func mapPreallocAnalyzer() *analysis.Analyzer {
 	var minRangeLen int
 
@@ -98,7 +88,7 @@ func checkBlockForMapPrealloc(stmts []ast.Stmt, pass *analysis.Pass, minRangeLen
 			if rangeBodyAssignsToMap(rangeStmt.Body, mapName) {
 				// Small literal range source, skip but keep scanning for
 				// later range loops that may have a larger source.
-				if litLen := rangeSourceLiteralLen(rangeStmt.X); litLen >= 0 && litLen < minRangeLen {
+				if litLen := rangeSourceLiteralLen(pass, rangeStmt.X); litLen >= 0 && litLen < minRangeLen {
 					continue
 				}
 

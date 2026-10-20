@@ -13,14 +13,10 @@ import (
 const bodyField = "Body"
 
 // redundantBodyDrainAnalyzer returns an analyzer that flags a manual drain of
-// an HTTP response body whose result is thrown away.
-//
-// From Go 1.27 an HTTP/1 Response.Body drains its own unread content on Close,
-// so the copy exists only to keep the connection reusable and no longer earns
-// its place. The automatic drain stops at a conservative limit, so a caller
-// that deliberately drains bodies larger than that limit still needs the copy;
-// keeping the result of the copy, rather than discarding it, is enough to take
-// the call out of scope here.
+// an HTTP response body whose result is discarded. From Go 1.27 an HTTP/1
+// Response.Body drains itself on Close. That drain stops at a limit, so a
+// caller draining larger bodies keeps the copy, and keeping its result takes
+// the call out of scope.
 func redundantBodyDrainAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "redundantbodydrain",
