@@ -61,6 +61,7 @@ func Categories() []Category {
 				preferColonEqualsAnalyzer(),
 				preferCutLastAnalyzer(),
 				urlCloneAnalyzer(),
+				literalSizeAnalyzer(),
 			},
 		},
 		{

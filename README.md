@@ -528,6 +528,7 @@ confirm.
 | `benchresettimer` | Setup before a `b.N` loop without `b.ResetTimer()` (`b.Loop()` resets it itself) |
 | `buildergrow` | `strings.Builder` in loop without `Grow()` |
 | `mapprealloc` | Map populated in loop without capacity hint |
+| `literalsize` | Bare literal as an array length or channel capacity, or as a `make` size in tests |
 | `typednilerror` | Typed nil returned as error interface (SSA) |
 | `stmtnoclose` | `db.Prepare` without `defer stmt.Close()` |
 | `chandirection` | Bidirectional `chan T` in function params |
