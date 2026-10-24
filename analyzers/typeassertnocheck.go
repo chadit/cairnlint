@@ -10,7 +10,8 @@ import (
 
 // typeAssertNoCheckAnalyzer returns an analyzer that flags single-value type
 // assertions like x := y.(Type). Without the comma-ok form, a failed
-// assertion panics at runtime. Use x, ok := y.(Type) or a type switch.
+// assertion panics at runtime. The comma-ok form or a type switch keeps the
+// failure as a value.
 func typeAssertNoCheckAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "typeassertnocheck",

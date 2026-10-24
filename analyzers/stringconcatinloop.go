@@ -12,7 +12,8 @@ import (
 
 // stringConcatInLoopAnalyzer returns an analyzer that flags string
 // concatenation (+=) inside loop bodies. Each concatenation allocates a new
-// string, turning an O(n) operation into O(n^2). Use strings.Builder instead.
+// string, turning an O(n) operation into O(n^2). strings.Builder grows one
+// buffer instead.
 func stringConcatInLoopAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "stringconcatinloop",
