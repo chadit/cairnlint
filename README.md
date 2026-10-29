@@ -110,9 +110,9 @@ stderr:
 [agent] heuristic findings written to /tmp/cairnlint-agent-12345.txt
 ```
 
-Standard diagnostics still go to stdout as usual. If the
-temp file can't be created, agent diagnostics fall back
-to stdout.
+Standard diagnostics still go to stdout as usual. A run
+with no agent findings writes no file. If the temp file
+can't be written, agent diagnostics fall back to stdout.
 
 ### Enabling agent mode
 
@@ -297,7 +297,9 @@ the body ignores the parameter outright.
 3. Create `analyzers/testdata/src/<name>/` with fixture
    files containing `// want` comments
 4. Register in `analyzers/agentmode.go` `AgentOnly()`
-5. Run `go test ./analyzers/` and `go build .`
+5. Add a row to the agent-only table above and bump the
+   count in its heading
+6. Run `go test ./analyzers/` and `go build .`
 
 ## Suppressing Diagnostics
 
@@ -409,6 +411,16 @@ linters:
 All analyzers run as part of the golangci-lint
 pipeline alongside your other linters.
 
+The agent-only analyzers join the set under the same
+environment variables the binary detects, so one
+environment gives one analyzer set from either entry
+point. The `--agent` flag has no plugin counterpart; set
+`CAIRNLINT_AGENT=1` instead. Under golangci-lint their
+findings go to its normal output rather than the temp
+file, because golangci-lint caches each package's issues
+and skips the analyzers on a cache hit, so a file written
+while they run would be empty on every warm run.
+
 ## Testing
 
 ```bash
@@ -498,8 +510,6 @@ confirm.
 | `stringconcatinloop` | `s += x` or `s = s + x` in loops |
 | `preferbloop` | `b.N` loops in benchmarks that `b.Loop()` can replace |
 | `dbquerywithbarebackground` | `db.*Context(ctx.Background())` |
-| `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
-| `redundantbodydrain` | `io.Copy(io.Discard, resp.Body)` before Close |
 | `noelse` | `if-else` blocks (use early returns) |
 
 ### Expression-level
@@ -510,10 +520,10 @@ confirm.
 | `noruntimenumgoroutine` | `runtime.NumGoroutine()` in tests |
 | `nogenericerror` | `errors.New("error")` vague messages |
 | `noerrstrcontains` | `Contains(err.Error(), ...)` |
-| `nopanicinlib` | `panic()` in non-test files |
+| `nopanicinlib` | `panic()` in non-test files outside `main()` and `init()` (a closure there is still flagged) |
 | `nocontextinstruct` | `context.Context` as struct field |
 | `prefererrorsastype` | `errors.As` (use `errors.AsType`) |
-| `preferfmtappendf` | `[]byte(fmt.Sprintf(...))` (Appendf or Fprintf) |
+| `preferfmtappendf` | `[]byte(fmt.Sprintf(...))` into `Write` (Fprintf) or spread into `append` (Appendf) |
 | `typeassertnocheck` | `x := y.(Type)` without comma-ok |
 | `notestifysuites` | `suite.Suite` embedding |
 | `prefervarzero` | `s := ""` (use `var s string`) |
@@ -530,8 +540,14 @@ confirm.
 | `mapprealloc` | Map populated in loop without capacity hint |
 | `literalsize` | Bare literal as an array length or channel capacity, or as a `make` size in tests |
 | `typednilerror` | Typed nil returned as error interface (SSA) |
-| `stmtnoclose` | `db.Prepare` without `defer stmt.Close()` |
-| `chandirection` | Bidirectional `chan T` in function params |
+
+### net/http
+
+| Analyzer | What it flags |
+| ---- | ---- |
+| `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
+| `httpclienttimeout` | `http.Client` composite literal without a `Timeout` field |
+| `redundantbodydrain` | `io.Copy(io.Discard, resp.Body)` before Close |
 
 ### Concurrency
 
@@ -542,7 +558,9 @@ confirm.
 | `wgdoneinwggo` | `wg.Done()` inside `wg.Go()` closure (double-decrement) |
 | `preferwggofanout` | `wg.Add(N)` + N-goroutine loop with `defer wg.Done()` |
 | `tickerleak` | `NewTicker`/`NewTimer` without `defer Stop()` below Go 1.23 |
+| `chandirection` | Bidirectional `chan T` in function params |
 | `chandirclose` | `close()` on bidirectional channel param |
+| `stmtnoclose` | `db.Prepare` without `defer stmt.Close()` |
 | `poolresetbeforeput` | `sync.Pool.Put` without Reset (SSA) |
 
 ### Code quality
@@ -560,6 +578,8 @@ confirm.
 | `noinlinemocks` | Inline `MockFoo` structs in tests |
 | `unattributedtodo` | Unowned TODO/FIXME/HACK/XXX |
 | `testcryptoinprod` | Test crypto packages in production code |
+| `redundanterrnilcheck` | Test `err == nil` assertion made redundant by a following `errors.Is`/`As`/`AsType` on the same `err` |
+| `preferfatalerrgate` | Non-halting `t.Error` in an `errors.Is`/`As`/`AsType` assertion when `err` is used afterward (use `t.Fatal`) |
 | `signalhandling` | `main()` with server but no signal handling |
 | `nodotimport` | Dot imports (`import . "pkg"`) |
 | `contextfirstparam` | `context.Context` not the first parameter |
@@ -590,29 +610,55 @@ confirm.
 
 ### Modernizers (golang.org/x/tools, report-only)
 
-21 analyzers imported from the upstream `modernize` suite,
+22 analyzers imported from the upstream `modernize` suite,
 the same set `go fix` runs. Importing them means the shared
 rules track each Go release without cairnlint maintaining a
-copy: `any`, `atomictypes`, `embedlit`, `forvar`,
-`importcomment`, `mapsloop`, `minmax`, `newexpr`,
-`omitzero`, `plusbuild`, `rangeint`, `reflecttypefor`,
-`slicesbackward`, `slicescontains`, `slicessort`,
-`stditerators`, `stringscut`, `stringscutprefix`,
-`stringsseq`, `unsafefuncs`, `waitgroupgo`.
+copy. The summaries below are upstream's.
 
-Run `cairnlint --list` for the one-line description of each.
+| Analyzer | Upstream summary |
+| ---- | ---- |
+| `any` | replace `interface{}` with `any` |
+| `atomictypes` | replace basic types in `sync/atomic` calls with atomic types |
+| `embedlit` | simplify references to embedded fields in composite literals |
+| `forvar` | remove redundant re-declaration of loop variables |
+| `importcomment` | remove obsolete comments specifying canonical import path |
+| `mapsloop` | replace explicit loops over maps with calls to `maps` package |
+| `minmax` | replace if/else statements with calls to `min` or `max` |
+| `omitzero` | suggest replacing `omitempty` with `omitzero` for struct fields |
+| `plusbuild` | remove obsolete `//+build` comments |
+| `rangeint` | replace 3-clause for loops with for-range over integers |
+| `reflecttypeassert` | replace `v.Interface().(T)` with `reflect.TypeAssert[T](v)` |
+| `reflecttypefor` | replace `reflect.TypeOf(x)` with `TypeFor[T]()` |
+| `slicesbackward` | replace backward loops over slices with `slices.Backward` |
+| `slicesclip` | replace three-index slice expressions with `slices.Clip` |
+| `slicescontains` | replace loops with `slices.Contains` or `slices.ContainsFunc` |
+| `slicessort` | replace `sort.Slice` with `slices.Sort` for basic types |
+| `stditerators` | use iterators instead of Len/At-style APIs |
+| `stringscut` | replace `strings.Index` etc. with `strings.Cut` |
+| `stringscutprefix` | replace `HasPrefix`/`TrimPrefix` with `CutPrefix` |
+| `stringsseq` | replace ranging over `Split`/`Fields` with `SplitSeq`/`FieldsSeq` |
+| `unsafefuncs` | replace unsafe pointer arithmetic with function calls |
+| `waitgroupgo` | replace `wg.Add(1)`/`go`/`wg.Done()` with `wg.Go` |
+
 Suppress them the same way as any other analyzer, by name:
 `//nolint:rangeint`.
 
-Three upstream analyzers are deliberately left out because
-a cairnlint rule already covers the same ground and would
-report the same line twice:
+Four upstream analyzers are deliberately left out. Three
+would report the same line as a cairnlint rule that
+already covers the same ground:
 
 | Skipped | Covered by |
 | ---- | ---- |
 | `errorsastype` | `prefererrorsastype` (fires on every `errors.As`) |
 | `stringsbuilder` | `stringconcatinloop` |
 | `testingcontext` | `contextbackground` and siblings |
+
+The fourth, `newexpr`, duplicates nothing. It declares
+analysis facts, and a single analyzer with facts makes the
+cairnlint binary type-check every dependency from source,
+the standard library included, on every run. No cairnlint
+rule needs facts, so leaving it out keeps every run on
+export data.
 
 Two more are absent because upstream disabled them in its
 own suite, and cairnlint keeps its own versions: `bloop`
@@ -628,4 +674,8 @@ own suite, and cairnlint keeps its own versions: `bloop`
 3. Create `analyzers/testdata/src/<name>/` with fixture
    files containing `// want` comments
 4. Register in `analyzers/analyzers.go` `All()`
-5. Run `go test ./analyzers/` and `go build .`
+5. Add a row to the README table named after its category
+6. Run `go test ./analyzers/` and `go build .`
+
+`analyzers/readme_test.go` fails when a README table and
+the registered set disagree.

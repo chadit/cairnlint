@@ -19,7 +19,7 @@ func typedNilErrorAnalyzer() *analysis.Analyzer {
 		Name:     "typednilerror",
 		Doc:      "flags returning a typed nil pointer as an error interface, which produces a non-nil error value",
 		Run:      runTypedNilError,
-		Requires: []*analysis.Analyzer{buildssa.Analyzer},
+		Requires: []*analysis.Analyzer{factFreeSSAAnalyzer},
 	}
 }
 
@@ -27,7 +27,7 @@ func typedNilErrorAnalyzer() *analysis.Analyzer {
 var errorType = types.Universe.Lookup("error").Type() //nolint:gochecknoglobals // package-internal type constant
 
 func runTypedNilError(pass *analysis.Pass) (any, error) {
-	ssaResult, castOK := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
+	ssaResult, castOK := pass.ResultOf[factFreeSSAAnalyzer].(*buildssa.SSA)
 	if !castOK {
 		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 	}

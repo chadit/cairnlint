@@ -10,22 +10,26 @@ import (
 )
 
 // writeMethodName is the io.Writer method that turns a []byte conversion into
-// an Fprintf opportunity rather than an Appendf one.
+// an Fprintf opportunity.
 const writeMethodName = "Write"
 
 // writeResultCount is the number of results on io.Writer.Write, used to tell
 // that method apart from same-named methods with other shapes.
 const writeResultCount = 2
 
+// appendSpreadArgCount is the argument count of append(dst, src...), the only
+// form Go allows with a spread.
+const appendSpreadArgCount = 2
+
 // preferFmtAppendfAnalyzer returns an analyzer that flags []byte(fmt.Sprintf(...))
-// conversions, which allocate an intermediate string. A result fed straight to
-// Write should become fmt.Fprintf rather than fmt.Appendf, so the diagnostic
-// names whichever fits. Suggesting Appendf everywhere got the upstream
-// modernizer pulled (golang/go#77581).
+// only where a direct replacement drops both the string and the slice: a Write
+// argument becomes fmt.Fprintf, an append spread becomes fmt.Appendf(dst, ...).
+// A bare conversion is left alone because upstream judged fmt.Appendf(nil, ...)
+// less clear and it returns nil on empty output (golang/go#77581, #77557).
 func preferFmtAppendfAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "preferfmtappendf",
-		Doc:      "flags []byte(fmt.Sprintf(...)); use fmt.Appendf(nil, ...), or fmt.Fprintf when the result feeds a Write call",
+		Doc:      "flags []byte(fmt.Sprintf(...)) passed to a Write call (use fmt.Fprintf) or spread into append (use fmt.Appendf(dst, ...))",
 		Run:      runPreferFmtAppendf,
 		Requires: []*analysis.Analyzer{inspect.Analyzer},
 	}
@@ -63,7 +67,11 @@ func runPreferFmtAppendf(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		pass.Reportf(call.Pos(), "use fmt.Appendf(nil, ...) instead of []byte(fmt.Sprintf(...)) to avoid intermediate string allocation")
+		if appendDst := enclosingAppendSpread(stack, pass.TypesInfo); appendDst != "" {
+			pass.Reportf(call.Pos(),
+				"use fmt.Appendf(%s, ...) instead of append(%s, []byte(fmt.Sprintf(...))...) to skip the intermediate string and byte slice",
+				appendDst, appendDst)
+		}
 
 		return true
 	})
@@ -148,4 +156,39 @@ func isWriteSignature(typ types.Type) bool {
 	}
 
 	return types.Identical(sig.Results().At(1).Type(), types.Universe.Lookup("error").Type())
+}
+
+// enclosingAppendSpread returns the source text of the destination when the
+// node on top of stack is the final, spread argument of the builtin append,
+// and the empty string otherwise. The destination needs no type check: a
+// []byte spread only compiles when the destination is a byte slice.
+func enclosingAppendSpread(stack []ast.Node, info *types.Info) string {
+	const parentDepth = 2
+	if len(stack) < parentDepth {
+		return ""
+	}
+
+	parent, isCall := stack[len(stack)-parentDepth].(*ast.CallExpr)
+	if !isCall || !parent.Ellipsis.IsValid() || len(parent.Args) != appendSpreadArgCount {
+		return ""
+	}
+
+	if parent.Args[1] != stack[len(stack)-1] || !isBuiltinAppend(parent.Fun, info) {
+		return ""
+	}
+
+	return types.ExprString(parent.Args[0])
+}
+
+// isBuiltinAppend reports whether fun names the predeclared append, so a
+// user-defined function that shadows the name is not matched.
+func isBuiltinAppend(fun ast.Expr, info *types.Info) bool {
+	ident, isIdent := fun.(*ast.Ident)
+	if !isIdent || ident.Name != "append" {
+		return false
+	}
+
+	_, isBuiltin := info.Uses[ident].(*types.Builtin)
+
+	return isBuiltin
 }

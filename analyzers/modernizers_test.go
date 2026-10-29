@@ -8,26 +8,26 @@ import (
 	"github.com/chadit/cairnlint/analyzers"
 )
 
-// supersededByCairnlint maps each upstream modernize analyzer that cairnlint
-// leaves unregistered to the native rule covering the same ground.
+// excludedModernizers maps each upstream modernize analyzer that cairnlint
+// leaves unregistered to the reason it stays out.
 //
 // Deliberately a second copy of the list in modernizers.go rather than a
 // reference to it. A test that reads the production list would agree with
 // whatever that list says, including when it says nothing useful.
-func supersededByCairnlint() map[string]string {
+func excludedModernizers() map[string]string {
 	return map[string]string{
-		"errorsastype":   "prefererrorsastype",
-		"stringsbuilder": "stringconcatinloop",
-		"testingcontext": "contextbackground",
+		"errorsastype":   "prefererrorsastype covers it",
+		"stringsbuilder": "stringconcatinloop covers it",
+		"testingcontext": "contextbackground covers it",
+		"newexpr":        "its facts force every dependency to load from source",
 	}
 }
 
-// TestSupersededModernizersStillExistUpstream guards the exclusion list against
+// TestExcludedModernizersStillExistUpstream guards the exclusion list against
 // a golang.org/x/tools bump that renames or drops an analyzer, which would
-// register it again and report every shared finding twice. That change compiles
-// and passes every other test, so a self-merging dependency update would reach
-// main unnoticed.
-func TestSupersededModernizersStillExistUpstream(t *testing.T) {
+// register it again under the new name. That change compiles and passes every
+// other test, so a self-merging dependency update would reach main unnoticed.
+func TestExcludedModernizersStillExistUpstream(t *testing.T) {
 	t.Parallel()
 
 	upstream := make(map[string]bool, len(modernize.Suite))
@@ -35,24 +35,24 @@ func TestSupersededModernizersStillExistUpstream(t *testing.T) {
 		upstream[analyzer.Name] = true
 	}
 
-	for name, native := range supersededByCairnlint() {
+	for name, reason := range excludedModernizers() {
 		if !upstream[name] {
-			t.Errorf("modernize.Suite no longer has %q: the exclusion in modernizers.go is dead, so %q now has a duplicate", name, native)
+			t.Errorf("modernize.Suite no longer has %q: the exclusion in modernizers.go is dead, and it was there because %s", name, reason)
 		}
 	}
 }
 
-// TestSupersededModernizersAreNotRegistered verifies the exclusion takes
-// effect, so no finding is reported by both an upstream analyzer and its
-// native counterpart.
-func TestSupersededModernizersAreNotRegistered(t *testing.T) {
+// TestExcludedModernizersAreNotRegistered verifies the exclusion takes effect,
+// so no finding is reported by both an upstream analyzer and its native
+// counterpart, and newexpr does not bring its facts back.
+func TestExcludedModernizersAreNotRegistered(t *testing.T) {
 	t.Parallel()
 
-	superseded := supersededByCairnlint()
+	excluded := excludedModernizers()
 
 	for _, analyzer := range analyzers.All() {
-		if native, covered := superseded[analyzer.Name]; covered {
-			t.Errorf("upstream analyzer %q is registered even though %q already covers it", analyzer.Name, native)
+		if reason, isExcluded := excluded[analyzer.Name]; isExcluded {
+			t.Errorf("upstream analyzer %q is registered even though %s", analyzer.Name, reason)
 		}
 	}
 }
@@ -63,7 +63,7 @@ func TestSupersededModernizersAreNotRegistered(t *testing.T) {
 func TestModernizersAreRegistered(t *testing.T) {
 	t.Parallel()
 
-	superseded := supersededByCairnlint()
+	excluded := excludedModernizers()
 
 	all := analyzers.All()
 
@@ -75,7 +75,7 @@ func TestModernizersAreRegistered(t *testing.T) {
 	var found int
 
 	for _, analyzer := range modernize.Suite {
-		if _, covered := superseded[analyzer.Name]; covered {
+		if _, isExcluded := excluded[analyzer.Name]; isExcluded {
 			continue
 		}
 

@@ -17,3 +17,8 @@ func TestReportedToAgentFile(t *testing.T) {
 	_ = context.Background()
 	_ = t
 }
+
+func TestAlsoReportedToAgentFile(t *testing.T) {
+	_ = context.Background()
+	_ = t
+}

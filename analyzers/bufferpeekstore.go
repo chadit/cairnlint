@@ -17,7 +17,7 @@ func bufferPeekStoreAnalyzer() *analysis.Analyzer {
 		Name:     "bufferpeekstore",
 		Doc:      "flags bytes.Buffer.Peek() results used after buffer mutation; the returned slice aliases internal memory and becomes invalid",
 		Run:      runBufferPeekStore,
-		Requires: []*analysis.Analyzer{buildssa.Analyzer},
+		Requires: []*analysis.Analyzer{factFreeSSAAnalyzer},
 	}
 }
 
@@ -41,7 +41,7 @@ var bufferMutators = map[string]bool{ //nolint:gochecknoglobals // package-inter
 }
 
 func runBufferPeekStore(pass *analysis.Pass) (any, error) {
-	ssaResult, castOK := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
+	ssaResult, castOK := pass.ResultOf[factFreeSSAAnalyzer].(*buildssa.SSA)
 	if !castOK {
 		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 	}

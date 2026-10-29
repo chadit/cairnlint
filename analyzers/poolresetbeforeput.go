@@ -23,7 +23,7 @@ func poolResetBeforePutAnalyzer() *analysis.Analyzer {
 		Name:     "poolresetbeforeput",
 		Doc:      "flags sync.Pool.Put without Reset; objects returned to a pool without cleanup carry stale data into the next Get",
 		Run:      runPoolResetBeforePut,
-		Requires: []*analysis.Analyzer{buildssa.Analyzer},
+		Requires: []*analysis.Analyzer{factFreeSSAAnalyzer},
 	}
 }
 
@@ -35,7 +35,7 @@ var cleanupMethodNames = map[string]bool{ //nolint:gochecknoglobals // package-i
 }
 
 func runPoolResetBeforePut(pass *analysis.Pass) (any, error) {
-	ssaResult, castOK := pass.ResultOf[buildssa.Analyzer].(*buildssa.SSA)
+	ssaResult, castOK := pass.ResultOf[factFreeSSAAnalyzer].(*buildssa.SSA)
 	if !castOK {
 		return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 	}

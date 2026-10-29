@@ -12,7 +12,6 @@ import (
 // keep the release that introduced an API visible at the call site and stop
 // goconst from flipping once several analyzers reference the same release.
 const (
-	goVersion118 = "go1.18"
 	goVersion119 = "go1.19"
 	goVersion123 = "go1.23"
 	goVersion124 = "go1.24"

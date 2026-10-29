@@ -6,10 +6,12 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-// TestNoPanicInLib verifies the nopanicinlib analyzer flags panic() calls in non-test files where errors should be returned instead.
+// TestNoPanicInLib verifies the nopanicinlib analyzer flags panic() calls in
+// non-test files where errors should be returned instead, and exempts a panic
+// directly in init, or in main of package main, but not in a closure there.
 func TestNoPanicInLib(t *testing.T) {
 	t.Parallel()
 
 	testdata := analysistest.TestData()
-	analysistest.Run(t, testdata, findAnalyzer("nopanicinlib"), "nopanicinlib")
+	analysistest.Run(t, testdata, findAnalyzer("nopanicinlib"), "nopanicinlib", "nopanicinlibmain")
 }
