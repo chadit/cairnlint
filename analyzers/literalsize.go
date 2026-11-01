@@ -20,7 +20,8 @@ const (
 // literalSizeAnalyzer returns an analyzer that flags a bare numeric literal
 // used as a size: an array length, a channel capacity, and in test files a
 // slice length or capacity or a map size hint. It covers the shapes mnd
-// skips, so every value counts, 0 and 1 included.
+// skips, so 0 and 1 count too. A zero array length and a zero slice length
+// beside a capacity are exempt.
 func literalSizeAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "literalsize",
@@ -121,17 +122,26 @@ func checkMakeSize(pass *analysis.Pass, call *ast.CallExpr) {
 }
 
 // reportSliceSizes reports a literal length and capacity of make on a
-// slice type in a test file.
+// slice type in a test file. A zero length beside a capacity is exempt,
+// because make([]T, 0, capacity) is the pre-allocation form the Go memory
+// rule prescribes. A zero length with no capacity still reports.
 func reportSliceSizes(pass *analysis.Pass, call *ast.CallExpr) {
 	if !isTestFile(pass, call) {
 		return
 	}
 
-	reportIfLiteral(pass, call.Args[makeLengthArg], "make length")
+	length := call.Args[makeLengthArg]
+	if len(call.Args) <= makeCapacityArg {
+		reportIfLiteral(pass, length, "make length")
 
-	if len(call.Args) > makeCapacityArg {
-		reportIfLiteral(pass, call.Args[makeCapacityArg], "make capacity")
+		return
 	}
+
+	if lit, isLit := length.(*ast.BasicLit); isLit && !isZeroLiteral(pass, lit) {
+		reportLiteralSize(pass, lit, "make length")
+	}
+
+	reportIfLiteral(pass, call.Args[makeCapacityArg], "make capacity")
 }
 
 // coreType returns the underlying type make builds. For a type parameter

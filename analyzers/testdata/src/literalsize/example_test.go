@@ -21,14 +21,17 @@ func TestSizes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ints := make([]int, 0, 16)        // want `literal size in make length; name it as a constant` `literal size in make capacity; name it as a constant`
+	ints := make([]int, 0, 16)        // want `literal size in make capacity; name it as a constant`
+	bare := make([]int, 0)            // want `literal size in make length; name it as a constant`
+	partial := make([]int, 2, 16)     // want `literal size in make length; name it as a constant` `literal size in make capacity; name it as a constant`
 	counts := make(map[string]int, 8) // want `literal size in make length; name it as a constant`
 	events := make(chan int, 2)       // want `literal size in channel capacity; name it as a constant`
 	named := make(buf, 4)             // want `literal size in make length; name it as a constant`
 	plain := make([]byte, pageSize)
+	sized := make([]int, 0, len(ints))
 	unsized := make(map[string]int)
 
-	_, _, _, _, _, _ = ints, counts, events, named, plain, unsized
+	_, _, _, _, _, _, _, _, _ = ints, sized, bare, partial, counts, events, named, plain, unsized
 }
 
 func genericSlice[T ~[]int]() T {
