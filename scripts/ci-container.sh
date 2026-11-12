@@ -11,11 +11,13 @@ trap 'echo "E: ci-container.sh failed on line ${LINENO}" >&2' ERR
 # Usage:
 #   scripts/ci-container.sh run [options] -- COMMAND [ARG...]
 #   scripts/ci-container.sh tag                 print the image tag for ci/Dockerfile
-#   scripts/ci-container.sh build               rebuild the image even if it exists
+#   scripts/ci-container.sh build               build the image without running a step
 #
-# `run` builds the image when this host lacks it, so there is no separate build
-# step to order. The tag is a hash of ci/Dockerfile, so editing it produces a
-# new tag and the next run rebuilds, once per container store.
+# `run` builds the default image before every step, so there is no separate
+# build step to order. The tag hashes only ci/Dockerfile, so a moved base tag
+# would leave a stale image under a tag that looks current. Building each time
+# lets --pull see the moved base, and the layer cache keeps an unchanged build
+# cheap. An image named with --image or CI_IMAGE is never built.
 #
 # Options:
 #   --image REF     image to run (default: the tag derived from ci/Dockerfile)
@@ -151,18 +153,17 @@ build_image() {
 	"$RUNTIME" build --pull -t "$IMAGE" -f "$DOCKERFILE" "${REPO_ROOT}/ci"
 }
 
-# ensure_image builds only when the image is absent.
+# ensure_image always builds the default image, even when its tag is present,
+# because the tag cannot show that the base moved underneath it.
 ensure_image() {
 	resolve_runtime
 	resolve_image
-	if image_present; then
+	if ! using_custom_image; then
+		build_image
 		return 0
 	fi
-	if using_custom_image; then
-		info "${IMAGE} is not local; leaving it to the runtime to fetch"
-		return 0
-	fi
-	build_image
+	image_present && return 0
+	info "${IMAGE} is not local; leaving it to the runtime to fetch"
 }
 
 # id_args prints uid mapping flags. keep-id holds the caller's uid inside the
@@ -213,7 +214,7 @@ run_step() {
 		args+=(--env "${name}=${!name-}")
 	done
 
-	# A derived tag only exists locally, so a miss means unbuilt, not unpulled.
+	# ensure_image just built the derived tag, and no registry has it to pull.
 	if ! using_custom_image; then
 		args+=(--pull=never)
 	fi
