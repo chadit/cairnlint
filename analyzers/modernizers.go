@@ -18,11 +18,10 @@ var supersededModernizers = []string{ //nolint:gochecknoglobals // package-inter
 	// contextbackground, contexttodo, and wrappedcontextbackground already
 	// push tests toward t.Context().
 	"testingcontext",
-	// newexpr declares FactTypes. One analyzer with facts switches the
-	// multichecker to packages.LoadAllSyntax, which type-checks every
-	// dependency from source, the standard library included, on every run.
-	// No cairnlint rule needs facts, so one modernizer should not set that
-	// cost for all of them.
+	// newexpr declares FactTypes, so the checker runs it on every dependency
+	// package, the standard library included, not only on the packages being
+	// checked. httpstatusliteral already makes each run load dependencies
+	// from source; newexpr would add a second analyzer pass over all of them.
 	"newexpr",
 }
 

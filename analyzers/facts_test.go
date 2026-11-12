@@ -39,17 +39,19 @@ func factDeclarers(roots []*analysis.Analyzer) []string {
 	return names
 }
 
-// TestNoRegisteredAnalyzerDeclaresFacts guards the load mode. One analyzer
-// with facts anywhere in the Requires closure makes the multichecker load
-// every dependency from source, the standard library included, and no
-// cairnlint rule uses facts to pay for that.
-func TestNoRegisteredAnalyzerDeclaresFacts(t *testing.T) {
+// TestOnlyHTTPStatusLiteralDeclaresFacts guards the load mode, since one
+// analyzer with facts in the Requires closure makes the multichecker load
+// every dependency from source. httpstatusliteral pays that because the
+// literal it reports sits in another package from the call that marks it.
+// Any other fact-bearing analyzer fails here, so adding one is a decision.
+func TestOnlyHTTPStatusLiteralDeclaresFacts(t *testing.T) {
 	t.Parallel()
 
 	registered := slices.Concat(analyzers.All(), analyzers.AgentOnly())
 
-	if names := factDeclarers(registered); len(names) > 0 {
-		t.Errorf("analyzers declaring facts: %v; each one switches the multichecker to packages.LoadAllSyntax", names)
+	want := []string{"httpstatusliteral"}
+	if names := factDeclarers(registered); !slices.Equal(names, want) {
+		t.Errorf("analyzers declaring facts: %v, want %v; each one switches the multichecker to packages.LoadAllSyntax", names, want)
 	}
 }
 

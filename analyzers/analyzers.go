@@ -70,6 +70,7 @@ func Categories() []Category {
 				noDefaultHTTPClientAnalyzer(),
 				httpClientTimeoutAnalyzer(),
 				redundantBodyDrainAnalyzer(),
+				httpStatusLiteralAnalyzer(),
 			},
 		},
 		{

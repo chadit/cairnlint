@@ -19,7 +19,7 @@ func excludedModernizers() map[string]string {
 		"errorsastype":   "prefererrorsastype covers it",
 		"stringsbuilder": "stringconcatinloop covers it",
 		"testingcontext": "contextbackground covers it",
-		"newexpr":        "its facts force every dependency to load from source",
+		"newexpr":        "its facts make it run over every dependency package",
 	}
 }
 

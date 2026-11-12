@@ -548,6 +548,22 @@ confirm.
 | `nodefaulthttpclient` | `http.DefaultClient` usage (no timeout) |
 | `httpclienttimeout` | `http.Client` composite literal without a `Timeout` field |
 | `redundantbodydrain` | `io.Copy(io.Discard, resp.Body)` before Close |
+| `httpstatusliteral` | Int literal that net/http names as `http.Status*`, set on, assigned to, or compared (`==`, `!=`, `switch`) with a field or variable its package passes to `WriteHeader`, `http.Error`, `http.Redirect`, or `http.Response.StatusCode` |
+
+`httpstatusliteral` reads where a value goes, not what it is
+called. A test that sets `StatusOverride: 404` on a fake
+server's struct is flagged when the fake server's package
+hands that field to `WriteHeader`, while an SMTP
+`Reply{Status: 421}` is left alone. The field and the literal
+usually sit in different packages, so the mark travels as an
+analysis fact. That makes every cairnlint run type-check its
+dependencies from source, the standard library included,
+rather than read export data. Only a direct pass marks a
+field: after `code := d.StatusOverride` and
+`w.WriteHeader(code)`, `code` is marked and `StatusOverride`
+is not. A literal passed straight to `WriteHeader`,
+`http.Error`, or `http.Redirect` is left to golangci-lint's
+`usestdlibvars`.
 
 ### Concurrency
 
@@ -654,11 +670,11 @@ already covers the same ground:
 | `testingcontext` | `contextbackground` and siblings |
 
 The fourth, `newexpr`, duplicates nothing. It declares
-analysis facts, and a single analyzer with facts makes the
-cairnlint binary type-check every dependency from source,
-the standard library included, on every run. No cairnlint
-rule needs facts, so leaving it out keeps every run on
-export data.
+analysis facts, so it would run over every dependency
+package, the standard library included, and not only the
+packages being checked. `httpstatusliteral` already makes
+each run load those packages from source; leaving `newexpr`
+out keeps a second analyzer from walking all of them.
 
 Two more are absent because upstream disabled them in its
 own suite, and cairnlint keeps its own versions: `bloop`
