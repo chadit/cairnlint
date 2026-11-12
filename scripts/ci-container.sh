@@ -141,12 +141,14 @@ image_present() {
 	"$RUNTIME" image inspect "$IMAGE" >/dev/null 2>&1        # docker fallback, absent image is expected
 }
 
-# build_image builds the CI image from ci/Dockerfile.
+# build_image builds the CI image from ci/Dockerfile. The base tag floats, so
+# --pull checks the registry on every build; a cached base would otherwise pin
+# the Go toolchain below what go.mod requires.
 build_image() {
 	resolve_runtime
 	resolve_image
 	info "building ${IMAGE} with ${RUNTIME}"
-	"$RUNTIME" build -t "$IMAGE" -f "$DOCKERFILE" "${REPO_ROOT}/ci"
+	"$RUNTIME" build --pull -t "$IMAGE" -f "$DOCKERFILE" "${REPO_ROOT}/ci"
 }
 
 # ensure_image builds only when the image is absent.
