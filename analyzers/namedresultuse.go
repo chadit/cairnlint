@@ -36,17 +36,7 @@ func runNamedResultUse(pass *analysis.Pass) (any, error) {
 	}
 
 	insp.Preorder(nodeFilter, func(node ast.Node) {
-		funcType, body, label := funcParts(node)
-		if body == nil {
-			return
-		}
-
-		results := namedResults(pass.TypesInfo, funcType)
-		if len(results) == 0 {
-			return
-		}
-
-		checkNamedResultUse(pass, body, label, results)
+		checkNamedResultUse(pass, node)
 	})
 
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
@@ -89,10 +79,21 @@ func namedResults(info *types.Info, funcType *ast.FuncType) map[*types.Var]*ast.
 }
 
 // checkNamedResultUse reports the first naked return and the first assignment
-// to each named result in body. Nested function literals are walked for
-// assignments, since they can reach the enclosing results, but their own
-// return statements belong to them and are skipped.
-func checkNamedResultUse(pass *analysis.Pass, body *ast.BlockStmt, label string, results map[*types.Var]*ast.Ident) {
+// to each named result in the body of fn, a FuncDecl or FuncLit. Nested
+// function literals are walked for assignments, since they can reach the
+// enclosing results, but their own return statements belong to them and are
+// skipped.
+func checkNamedResultUse(pass *analysis.Pass, fn ast.Node) {
+	funcType, body, label := funcParts(fn)
+	if body == nil {
+		return
+	}
+
+	results := namedResults(pass.TypesInfo, funcType)
+	if len(results) == 0 {
+		return
+	}
+
 	if assignsResultInDefer(pass.TypesInfo, body, results) {
 		return
 	}

@@ -49,12 +49,12 @@ func runSynctestSleepWait(pass *analysis.Pass) (any, error) {
 func checkBlockForSleepThenWait(stmts []ast.Stmt, pass *analysis.Pass) {
 	for idx := range len(stmts) - 1 {
 		sleep := exprStmtCall(stmts[idx])
-		if sleep == nil || !isCallTo(sleep, pass.TypesInfo, timePkgPath, "Sleep") {
+		if sleep == nil || !isCallTo(sleep, pass.TypesInfo, callMatcher{pkgPath: timePkgPath, funcName: "Sleep"}) {
 			continue
 		}
 
 		wait := exprStmtCall(stmts[idx+1])
-		if wait == nil || !isCallTo(wait, pass.TypesInfo, synctestPkgPath, "Wait") {
+		if wait == nil || !isCallTo(wait, pass.TypesInfo, callMatcher{pkgPath: synctestPkgPath, funcName: "Wait"}) {
 			continue
 		}
 

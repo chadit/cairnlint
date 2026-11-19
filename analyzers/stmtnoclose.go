@@ -48,8 +48,8 @@ func runStmtNoClose(pass *analysis.Pass) (any, error) {
 
 		// Match db.Prepare or db.PrepareContext where the receiver is
 		// from database/sql (covers *sql.DB and *sql.Tx).
-		isPrepare := isCallTo(call, pass.TypesInfo, "database/sql", "Prepare")
-		isPrepareCtx := isCallTo(call, pass.TypesInfo, "database/sql", "PrepareContext")
+		isPrepare := isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: "database/sql", funcName: "Prepare"})
+		isPrepareCtx := isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: "database/sql", funcName: "PrepareContext"})
 
 		if !isPrepare && !isPrepareCtx {
 			return true

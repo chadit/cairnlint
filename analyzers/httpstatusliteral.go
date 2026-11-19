@@ -457,8 +457,8 @@ func structLitFields(info *types.Info, lit *ast.CompositeLit) iter.Seq2[*types.V
 			return
 		}
 
-		for idx, elt := range lit.Elts {
-			field, value := litElement(info, fields, idx, elt)
+		for idx := range lit.Elts {
+			field, value := litElement(info, lit, idx)
 			if field != nil && !yield(field.Origin(), value) {
 				return
 			}
@@ -483,7 +483,8 @@ func litStruct(typ types.Type) *types.Struct {
 	return fields
 }
 
-func litElement(info *types.Info, fields *types.Struct, idx int, elt ast.Expr) (*types.Var, ast.Expr) {
+func litElement(info *types.Info, lit *ast.CompositeLit, idx int) (*types.Var, ast.Expr) {
+	elt := lit.Elts[idx]
 	if keyValue, isKeyed := elt.(*ast.KeyValueExpr); isKeyed {
 		key, isIdent := keyValue.Key.(*ast.Ident)
 		if !isIdent {
@@ -495,7 +496,8 @@ func litElement(info *types.Info, fields *types.Struct, idx int, elt ast.Expr) (
 		return field, keyValue.Value
 	}
 
-	if idx >= fields.NumFields() {
+	fields := litStruct(info.TypeOf(lit))
+	if fields == nil || idx >= fields.NumFields() {
 		return nil, nil
 	}
 

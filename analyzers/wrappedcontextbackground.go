@@ -50,5 +50,5 @@ func hasBackgroundArg(call *ast.CallExpr, info *types.Info) bool {
 		return false
 	}
 
-	return isCallTo(argCall, info, contextPkgPath, "Background")
+	return isCallTo(argCall, info, callMatcher{pkgPath: contextPkgPath, funcName: "Background"})
 }

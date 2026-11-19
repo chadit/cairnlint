@@ -100,7 +100,7 @@ func blankAssignCall(assign *ast.AssignStmt) *ast.CallExpr {
 // isResponseBodyDrain reports whether call copies an http.Response body into
 // io.Discard.
 func isResponseBodyDrain(call *ast.CallExpr, info *types.Info) bool {
-	if !isCallTo(call, info, ioPkgPath, "Copy") || len(call.Args) != 2 {
+	if !isCallTo(call, info, callMatcher{pkgPath: ioPkgPath, funcName: "Copy"}) || len(call.Args) != 2 {
 		return false
 	}
 

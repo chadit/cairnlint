@@ -21,6 +21,14 @@ type receiverMethods struct {
 	total   int
 }
 
+// passthroughIndex holds what the pass's non-test files declare, collected
+// across files before reporting: each receiver's methods that have a body and
+// where each type is declared.
+type passthroughIndex struct {
+	byReceiver map[string]*receiverMethods
+	typePos    map[string]token.Pos
+}
+
 // agentPassthroughAnalyzer flags methods that only forward their arguments to
 // another value, and types whose every method does so (Fowler's Middle Man).
 // It is agent-only because forwarding is sometimes the point, as in a boundary
@@ -35,28 +43,30 @@ func agentPassthroughAnalyzer() *analysis.Analyzer {
 }
 
 func runAgentPassthrough(pass *analysis.Pass) (any, error) {
-	byReceiver := make(map[string]*receiverMethods)
-	typePos := make(map[string]token.Pos)
-
-	for _, file := range pass.Files {
-		collectPassthrough(pass, file, byReceiver, typePos)
+	index := passthroughIndex{
+		byReceiver: make(map[string]*receiverMethods),
+		typePos:    make(map[string]token.Pos),
 	}
 
-	for recv, methods := range byReceiver {
-		reportPassthrough(pass, recv, methods, typePos)
+	for _, file := range pass.Files {
+		index.collect(pass, file)
+	}
+
+	for recv, methods := range index.byReceiver {
+		index.report(pass, recv, methods)
 	}
 
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
 }
 
-func collectPassthrough(pass *analysis.Pass, file *ast.File, byReceiver map[string]*receiverMethods, typePos map[string]token.Pos) {
+func (index *passthroughIndex) collect(pass *analysis.Pass, file *ast.File) {
 	if isTestFile(pass, file) {
 		return
 	}
 
 	for _, decl := range file.Decls {
-		recordTypePositions(decl, typePos)
-		recordMethod(decl, byReceiver)
+		recordTypePositions(decl, index.typePos)
+		recordMethod(decl, index.byReceiver)
 	}
 }
 
@@ -100,16 +110,16 @@ func recordMethod(decl ast.Decl, byReceiver map[string]*receiverMethods) {
 	}
 }
 
-// reportPassthrough emits the type-level finding when every method forwards
+// report emits the type-level finding when every method forwards
 // out of a single field, and the per-method finding otherwise. Reporting one
 // or the other keeps a wrapper with eight methods from producing eight
 // diagnostics that all say the same thing.
-func reportPassthrough(pass *analysis.Pass, recv string, methods *receiverMethods, typePos map[string]token.Pos) {
+func (index *passthroughIndex) report(pass *analysis.Pass, recv string, methods *receiverMethods) {
 	if len(methods.forward) == 0 {
 		return
 	}
 
-	pos, known := typePos[recv]
+	pos, known := index.typePos[recv]
 	if known && methods.total == len(methods.forward) && singleFieldStruct(pass, recv) {
 		pass.Reportf(pos, "type %s wraps one field and every one of its %d methods forwards; callers can hold the wrapped value directly", recv, methods.total)
 

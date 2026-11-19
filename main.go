@@ -49,7 +49,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		os.Exit(RunAutoTagsPasses(context.Background(), os.Stdout, os.Stderr, exe, os.Args[1:]))
+		os.Exit(RunAutoTagsPasses(context.Background(), &AutoTagsRun{
+			Stdout:     os.Stdout,
+			Stderr:     os.Stderr,
+			Executable: exe,
+			PassArgs:   os.Args[1:],
+		}))
 	}
 
 	if tagsFlag != "" {

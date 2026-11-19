@@ -52,7 +52,7 @@ func runNoContextInStruct(pass *analysis.Pass) (any, error) {
 // dot-import) forms.
 func isContextType(expr ast.Expr) bool {
 	sel, isSel := expr.(*ast.SelectorExpr)
-	if !isSel || sel.Sel.Name != "Context" {
+	if !isSel || sel.Sel.Name != contextTypeName {
 		return false
 	}
 

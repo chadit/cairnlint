@@ -74,7 +74,7 @@ func runSynctestRealServer(pass *analysis.Pass) (any, error) {
 // server backed by a real listener, and the empty string otherwise.
 func realServerCtorName(call *ast.CallExpr, info *types.Info) string {
 	for _, ctor := range httptestRealServerCtors {
-		if isCallTo(call, info, httptestPkgPath, ctor) {
+		if isCallTo(call, info, callMatcher{pkgPath: httptestPkgPath, funcName: ctor}) {
 			return ctor
 		}
 	}

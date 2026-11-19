@@ -28,10 +28,12 @@ func preferCutLastAnalyzer() *analysis.Analyzer {
 }
 
 // cutLastCandidate records a LastIndex call along with the operand it indexes
-// into, so a later slice expression can be matched against both.
+// into and the object holding the index it returned, so a later slice
+// expression can be matched against both.
 type cutLastCandidate struct {
 	call    *ast.CallExpr
 	operand types.Object
+	index   types.Object
 	pkgName string
 }
 
@@ -56,12 +58,12 @@ func runPreferCutLast(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		for index, candidate := range collectCutLastCandidates(body, pass.TypesInfo) {
+		for _, candidate := range collectCutLastCandidates(body, pass.TypesInfo) {
 			if _, done := reported[candidate.call.Pos()]; done {
 				continue
 			}
 
-			if !slicesOperandWithIndex(body, pass.TypesInfo, candidate.operand, index) {
+			if !slicesOperandWithIndex(body, pass.TypesInfo, candidate) {
 				continue
 			}
 
@@ -126,7 +128,7 @@ func collectCutLastCandidates(body *ast.BlockStmt, info *types.Info) map[types.O
 			return true
 		}
 
-		candidates[result] = cutLastCandidate{call: call, operand: operand, pkgName: pkgName}
+		candidates[result] = cutLastCandidate{call: call, operand: operand, index: result, pkgName: pkgName}
 
 		return true
 	})
@@ -137,20 +139,21 @@ func collectCutLastCandidates(body *ast.BlockStmt, info *types.Info) map[types.O
 // lastIndexPackage returns "strings" or "bytes" when call is that package's
 // LastIndex function, and the empty string otherwise.
 func lastIndexPackage(call *ast.CallExpr, info *types.Info) string {
-	if isCallTo(call, info, stringsPkgPath, lastIndexFunc) {
+	if isCallTo(call, info, callMatcher{pkgPath: stringsPkgPath, funcName: lastIndexFunc}) {
 		return stringsPkgPath
 	}
 
-	if isCallTo(call, info, bytesPkgPath, lastIndexFunc) {
+	if isCallTo(call, info, callMatcher{pkgPath: bytesPkgPath, funcName: lastIndexFunc}) {
 		return bytesPkgPath
 	}
 
 	return ""
 }
 
-// slicesOperandWithIndex reports whether body slices operand using a bound that
-// mentions index, which is the half of the pattern CutLast replaces.
-func slicesOperandWithIndex(body *ast.BlockStmt, info *types.Info, operand, index types.Object) bool {
+// slicesOperandWithIndex reports whether body slices target.operand using a
+// bound that mentions target.index, which is the half of the pattern CutLast
+// replaces.
+func slicesOperandWithIndex(body *ast.BlockStmt, info *types.Info, target cutLastCandidate) bool {
 	var found bool
 
 	ast.Inspect(body, func(node ast.Node) bool {
@@ -163,11 +166,11 @@ func slicesOperandWithIndex(body *ast.BlockStmt, info *types.Info, operand, inde
 			return true
 		}
 
-		if sliced, isIdent := identObject(slice.X, info); !isIdent || sliced != operand {
+		if sliced, isIdent := identObject(slice.X, info); !isIdent || sliced != target.operand {
 			return true
 		}
 
-		found = mentionsObject(slice.Low, info, index) || mentionsObject(slice.High, info, index)
+		found = mentionsObject(slice.Low, info, target.index) || mentionsObject(slice.High, info, target.index)
 
 		return !found
 	})

@@ -36,7 +36,7 @@ func runPreferErrorsAsType(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		if !isCallTo(call, pass.TypesInfo, "errors", "As") {
+		if !isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: errorsPkgPath, funcName: asFunc}) {
 			return
 		}
 

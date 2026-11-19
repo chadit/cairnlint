@@ -100,9 +100,15 @@ func recordReferences(pass *analysis.Pass, usage map[*types.Func]*calleeUsage) {
 	for _, file := range pass.Files {
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, isCall := node.(*ast.CallExpr)
-			if isCall {
-				markCall(pass, call, callees, usage)
+			if !isCall {
+				return true
 			}
+
+			if ident := identOf(call.Fun); ident != nil {
+				callees[ident] = true
+			}
+
+			markCall(pass, call, usage)
 
 			return true
 		})
@@ -111,13 +117,11 @@ func recordReferences(pass *analysis.Pass, usage map[*types.Func]*calleeUsage) {
 	markEscapes(pass, callees, usage)
 }
 
-func markCall(pass *analysis.Pass, call *ast.CallExpr, callees map[*ast.Ident]bool, usage map[*types.Func]*calleeUsage) {
+func markCall(pass *analysis.Pass, call *ast.CallExpr, usage map[*types.Func]*calleeUsage) {
 	ident := identOf(call.Fun)
 	if ident == nil {
 		return
 	}
-
-	callees[ident] = true
 
 	obj, isFunc := pass.TypesInfo.Uses[ident].(*types.Func)
 	if !isFunc {

@@ -92,7 +92,7 @@ func runBuilderGrow(pass *analysis.Pass, minRangeLen int) (any, error) {
 			return true
 		}
 
-		if hasGrowBeforeLoop(stack, loopNode, receiver, pass.TypesInfo) {
+		if hasGrowBeforeLoop(stack, receiver, pass.TypesInfo) {
 			return true
 		}
 
@@ -160,10 +160,13 @@ func enclosingLoop(stack []ast.Node) ast.Node {
 }
 
 // hasGrowBeforeLoop checks whether a Grow() call on the same receiver appears
-// in the enclosing block before the loop node. Walks the inspector stack to
-// find the block that directly contains the loop, then scans statements
-// preceding the loop for a matching Grow call.
-func hasGrowBeforeLoop(stack []ast.Node, loopNode ast.Node, receiver string, info *types.Info) bool {
+// before the loop enclosingLoop returns, the nearest loop inside the current
+// function, and is false when there is none. It finds the block that directly
+// contains the loop, then scans the statements before the loop for a matching
+// Grow call.
+func hasGrowBeforeLoop(stack []ast.Node, receiver string, info *types.Info) bool {
+	loopNode := enclosingLoop(stack)
+
 	// Find the block statement that contains the loop by walking the stack.
 	var enclosingBlock *ast.BlockStmt
 

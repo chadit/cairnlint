@@ -277,7 +277,7 @@ func errorsMatchFuncName(call *ast.CallExpr, info *types.Info) (string, bool) {
 	}
 
 	switch sel.Sel.Name {
-	case "Is", "As", "AsType":
+	case isFunc, asFunc, "AsType":
 		return sel.Sel.Name, true
 	default:
 		return "", false

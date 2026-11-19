@@ -53,7 +53,7 @@ func runNoGenericError(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		if !isCallTo(call, pass.TypesInfo, "errors", "New") {
+		if !isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: errorsPkgPath, funcName: "New"}) {
 			return
 		}
 

@@ -110,6 +110,7 @@ func Categories() []Category {
 				tlsConfigRandAnalyzer(),
 				goDebugRemovedAnalyzer(),
 				namedResultUseAnalyzer(),
+				paramLimitAnalyzer(),
 			},
 		},
 		{

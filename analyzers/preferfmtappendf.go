@@ -90,7 +90,7 @@ func isSprintfByteConversion(call *ast.CallExpr, info *types.Info) bool {
 		return false
 	}
 
-	return isCallTo(innerCall, info, "fmt", "Sprintf")
+	return isCallTo(innerCall, info, callMatcher{pkgPath: "fmt", funcName: "Sprintf"})
 }
 
 // isByteSliceConversion reports whether call is a type conversion to []byte.

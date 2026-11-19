@@ -114,7 +114,12 @@ func checkErrGate(pass *analysis.Pass, ifStmt *ast.IfStmt, stack []ast.Node) {
 		guarded = append(guarded, extracted)
 	}
 
-	if !objectsUsedAfter(block, ifStmt, guarded, pass.TypesInfo) {
+	idx := blockIndexOf(block, ifStmt)
+	if idx < 0 {
+		return
+	}
+
+	if !objectsUsedIn(block.List[idx+1:], guarded, pass.TypesInfo) {
 		return
 	}
 
@@ -150,7 +155,7 @@ func errorsGateInfo(ifStmt *ast.IfStmt, info *types.Info) (types.Object, types.O
 		}
 
 		var target types.Object
-		if name == "As" && len(call.Args) >= 2 {
+		if name == asFunc && len(call.Args) >= 2 {
 			target, _ = addrOperandObject(call.Args[1], info)
 		}
 
@@ -244,15 +249,10 @@ func firstNonHaltingFailCall(body *ast.BlockStmt, info *types.Info) *ast.CallExp
 	return found
 }
 
-// objectsUsedAfter reports whether any of objs is referenced in a statement
-// that follows ifStmt within the same block.
-func objectsUsedAfter(block *ast.BlockStmt, ifStmt *ast.IfStmt, objs []types.Object, info *types.Info) bool {
-	idx := blockIndexOf(block, ifStmt)
-	if idx < 0 {
-		return false
-	}
-
-	for _, stmt := range block.List[idx+1:] {
+// objectsUsedIn reports whether any of objs is referenced in stmts, the
+// statements that follow the gate within its block.
+func objectsUsedIn(stmts []ast.Stmt, objs []types.Object, info *types.Info) bool {
+	for _, stmt := range stmts {
 		if stmtUsesAnyObject(stmt, objs, info) {
 			return true
 		}

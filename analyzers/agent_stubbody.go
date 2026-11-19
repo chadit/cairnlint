@@ -68,10 +68,7 @@ func checkStubBody(pass *analysis.Pass, funcDecl *ast.FuncDecl) {
 	case len(funcDecl.Body.List) == 0:
 		reportEmptyBody(pass, funcDecl, hasDoc)
 	case len(funcDecl.Body.List) == 1:
-		ret, isReturn := funcDecl.Body.List[0].(*ast.ReturnStmt)
-		if isReturn {
-			checkSingleReturn(pass, funcDecl, ret, hasDoc)
-		}
+		checkSingleReturn(pass, funcDecl, hasDoc)
 	}
 }
 
@@ -87,8 +84,14 @@ func reportEmptyBody(pass *analysis.Pass, funcDecl *ast.FuncDecl, hasDoc bool) {
 		kindOf(funcDecl), funcDecl.Name.Name)
 }
 
-// checkSingleReturn flags a one-line return that hands back a canned value.
-func checkSingleReturn(pass *analysis.Pass, funcDecl *ast.FuncDecl, ret *ast.ReturnStmt, hasDoc bool) {
+// checkSingleReturn flags a one-statement body whose return hands back a
+// canned value.
+func checkSingleReturn(pass *analysis.Pass, funcDecl *ast.FuncDecl, hasDoc bool) {
+	ret, isReturn := funcDecl.Body.List[0].(*ast.ReturnStmt)
+	if !isReturn {
+		return
+	}
+
 	if text, isStub := notImplementedSentinel(pass, ret); isStub {
 		pass.Reportf(funcDecl.Name.Pos(),
 			"[agent] %s %s is a %q stub: wire up a real implementation before use",

@@ -34,17 +34,19 @@ func runFactFreeSSA(pass *analysis.Pass) (any, error) {
 	ssaPkg := prog.CreatePackage(pass.Pkg, pass.Files, pass.TypesInfo, false)
 	ssaPkg.Build()
 
-	var funcs []*ssa.Function
+	funcs := make([]*ssa.Function, 0, len(pass.Files))
 	for _, file := range pass.Files {
-		funcs = appendFileFuncs(funcs, prog, pass.TypesInfo, file)
+		funcs = append(funcs, fileFuncs(prog, pass.TypesInfo, file)...)
 	}
 
 	return &buildssa.SSA{Pkg: ssaPkg, SrcFuncs: funcs}, nil
 }
 
-// appendFileFuncs appends the SSA function for each func declaration in file,
-// each followed by its closures, which keeps SrcFuncs in source order.
-func appendFileFuncs(funcs []*ssa.Function, prog *ssa.Program, info *types.Info, file *ast.File) []*ssa.Function {
+// fileFuncs returns the SSA function for each func declaration in file, each
+// followed by its closures, which keeps SrcFuncs in source order.
+func fileFuncs(prog *ssa.Program, info *types.Info, file *ast.File) []*ssa.Function {
+	var funcs []*ssa.Function
+
 	for _, decl := range file.Decls {
 		funcDecl, isFuncDecl := decl.(*ast.FuncDecl)
 		if !isFuncDecl {

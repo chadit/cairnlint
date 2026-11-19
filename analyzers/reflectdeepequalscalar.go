@@ -43,7 +43,7 @@ func runReflectDeepEqualScalar(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		if !isCallTo(call, pass.TypesInfo, reflectPkgPath, "DeepEqual") {
+		if !isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: reflectPkgPath, funcName: "DeepEqual"}) {
 			return
 		}
 

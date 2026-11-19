@@ -71,7 +71,7 @@ func hasErrDotErrorArg(call *ast.CallExpr, pass *analysis.Pass) bool {
 // errDotErrorArgIndex returns the argument index that should contain the
 // haystack string for the matched function.
 func errDotErrorArgIndex(call *ast.CallExpr, pass *analysis.Pass) int {
-	if isCallTo(call, pass.TypesInfo, stringsPkgPath, "Contains") {
+	if isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: stringsPkgPath, funcName: "Contains"}) {
 		return 0
 	}
 

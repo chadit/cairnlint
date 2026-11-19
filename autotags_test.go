@@ -133,7 +133,12 @@ func TestRunAutoTagsPassesMergesOutput(t *testing.T) {
 
 	// echo will ignore any -tags=<value> prefix and print the rest.
 	// Pass a fixed pattern arg so the discovery walk finds our fixtures.
-	code := cairnlint.RunAutoTagsPasses(t.Context(), &stdout, &stderr, "/bin/echo", []string{wildcardPattern})
+	code := cairnlint.RunAutoTagsPasses(t.Context(), &cairnlint.AutoTagsRun{
+		Stdout:     &stdout,
+		Stderr:     &stderr,
+		Executable: "/bin/echo",
+		PassArgs:   []string{wildcardPattern},
+	})
 	if code != 0 {
 		t.Errorf("exit code: got %d, want 0", code)
 	}

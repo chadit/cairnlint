@@ -68,6 +68,13 @@ type docLine struct {
 	blockStart bool
 }
 
+// sentencePos is where a sentence opens: the doc line and the byte offset
+// into its text.
+type sentencePos struct {
+	line   docLine
+	offset int
+}
+
 // docTutorialVoiceAnalyzer returns an analyzer that flags instructional
 // voice in doc comments. Reader-addressing phrases, imperative sentence
 // openers, and go test run instructions read as tutorial prose rather than
@@ -238,16 +245,16 @@ func reportImperativeOpeners(pass *analysis.Pass, lines []docLine, idents map[st
 
 	for _, line := range lines {
 		for _, offset := range scan.starts(line) {
-			reportOpenerAt(pass, line, offset, idents)
+			reportOpenerAt(pass, sentencePos{line: line, offset: offset}, idents)
 		}
 	}
 }
 
-// reportOpenerAt reports an imperative opener at offset unless the word is
+// reportOpenerAt reports an imperative opener at start unless the word is
 // a package identifier, which covers the function's own name, or the
 // phrase is a noun compound such as "Use of" or "Call sites".
-func reportOpenerAt(pass *analysis.Pass, line docLine, offset int, idents map[string]bool) {
-	match := imperativeOpenerPattern.FindStringSubmatch(line.text[offset:])
+func reportOpenerAt(pass *analysis.Pass, start sentencePos, idents map[string]bool) {
+	match := imperativeOpenerPattern.FindStringSubmatch(start.line.text[start.offset:])
 	if match == nil {
 		return
 	}
@@ -257,7 +264,7 @@ func reportOpenerAt(pass *analysis.Pass, line docLine, offset int, idents map[st
 		return
 	}
 
-	pass.Reportf(line.comment.Pos()+token.Pos(commentMarkerLen+offset),
+	pass.Reportf(start.line.comment.Pos()+token.Pos(commentMarkerLen+start.offset),
 		"instructional voice in doc comment: a sentence that opens with %q tells the reader what to do; "+
 			"rewrite in declarative voice describing the function", opener)
 }

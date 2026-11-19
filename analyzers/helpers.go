@@ -32,6 +32,9 @@ const (
 	urlPkgPath      = "net/url"
 )
 
+// contextTypeName is the name of the context package's Context type.
+const contextTypeName = "Context"
+
 // mainPkgName is the package name of an executable's entry package.
 const mainPkgName = "main"
 
@@ -45,9 +48,11 @@ const (
 	containsFunc    = "Contains"
 	errorName       = "Error"
 	isFunc          = "Is"
+	asFunc          = "As"
 )
 
-// callMatcher describes a function call to flag in test files.
+// callMatcher names a function or method by the import path of its declaring
+// package and its name.
 type callMatcher struct {
 	pkgPath  string
 	funcName string
@@ -178,7 +183,7 @@ func isFirstArgOfAny(stack []ast.Node, info *types.Info, matchers []callMatcher)
 // matchesAny reports whether call matches any of the provided matchers.
 func matchesAny(call *ast.CallExpr, info *types.Info, matchers []callMatcher) bool {
 	for _, mat := range matchers {
-		if isCallTo(call, info, mat.pkgPath, mat.funcName) {
+		if isCallTo(call, info, mat) {
 			return true
 		}
 	}
@@ -212,11 +217,11 @@ func hasTestFiles(pass *analysis.Pass) bool {
 	return false
 }
 
-// isCallTo reports whether call is a call to pkgPath.funcName.
+// isCallTo reports whether call is a call to target's pkgPath.funcName.
 // Uses type info to resolve through aliases and dot-imports.
-func isCallTo(call *ast.CallExpr, info *types.Info, pkgPath, funcName string) bool {
+func isCallTo(call *ast.CallExpr, info *types.Info, target callMatcher) bool {
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
-	if !isSel || sel.Sel.Name != funcName {
+	if !isSel || sel.Sel.Name != target.funcName {
 		return false
 	}
 
@@ -227,14 +232,14 @@ func isCallTo(call *ast.CallExpr, info *types.Info, pkgPath, funcName string) bo
 
 	pkg := obj.Pkg()
 
-	return pkg != nil && pkg.Path() == pkgPath
+	return pkg != nil && pkg.Path() == target.pkgPath
 }
 
 // isInsideSynctestClosure reports whether the node on top of stack sits in a
 // function literal passed to synctest.Test.
 func isInsideSynctestClosure(stack []ast.Node, info *types.Info) bool {
 	return isInsideClosureArgOf(stack, func(call *ast.CallExpr) bool {
-		return isCallTo(call, info, synctestPkgPath, "Test")
+		return isCallTo(call, info, callMatcher{pkgPath: synctestPkgPath, funcName: "Test"})
 	})
 }
 
@@ -277,8 +282,19 @@ func isTestingType(typ types.Type) bool {
 // Callers pick the names they accept, so one lookup serves the receiver
 // checks, the parameter checks, and the benchmark signature check.
 func testingTypeName(typ types.Type) string {
-	if typ == nil {
+	named := namedTypeOf(typ)
+	if named == nil || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != testingPkgPath {
 		return ""
+	}
+
+	return named.Obj().Name()
+}
+
+// namedTypeOf returns the named type behind typ, looking through one pointer
+// and any aliases, or nil when there is none.
+func namedTypeOf(typ types.Type) *types.Named {
+	if typ == nil {
+		return nil
 	}
 
 	typ = types.Unalias(typ)
@@ -286,12 +302,9 @@ func testingTypeName(typ types.Type) string {
 		typ = types.Unalias(ptr.Elem())
 	}
 
-	named, isNamed := typ.(*types.Named)
-	if !isNamed || named.Obj().Pkg() == nil || named.Obj().Pkg().Path() != testingPkgPath {
-		return ""
-	}
+	named, _ := typ.(*types.Named)
 
-	return named.Obj().Name()
+	return named
 }
 
 // isTestingBExpr reports whether expr has type *testing.B.

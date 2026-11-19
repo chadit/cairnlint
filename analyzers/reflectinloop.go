@@ -50,7 +50,7 @@ func runReflectInLoop(pass *analysis.Pass) (any, error) {
 			return true
 		}
 
-		if !isCallTo(call, pass.TypesInfo, "reflect", funcName) {
+		if !isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: "reflect", funcName: funcName}) {
 			return true
 		}
 

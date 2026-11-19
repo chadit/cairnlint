@@ -54,7 +54,7 @@ func runURLClone(pass *analysis.Pass) (any, error) {
 // reportMapsCloneOnValues flags maps.Clone applied to url.Values, which leaves
 // every value slice shared between the two maps.
 func reportMapsCloneOnValues(pass *analysis.Pass, call *ast.CallExpr) {
-	if !isCallTo(call, pass.TypesInfo, "maps", "Clone") || len(call.Args) != 1 {
+	if !isCallTo(call, pass.TypesInfo, callMatcher{pkgPath: "maps", funcName: "Clone"}) || len(call.Args) != 1 {
 		return
 	}
 
