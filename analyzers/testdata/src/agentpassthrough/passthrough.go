@@ -15,7 +15,7 @@ func (i *inner) Sep() string {
 }
 
 // Wrapper holds one field and forwards every method to it.
-type Wrapper struct { // want `every one of its 2 methods forwards`
+type Wrapper struct { // want `^\[agent\] type Wrapper wraps one field and every one of its 2 methods forwards`
 	in *inner
 }
 
@@ -36,7 +36,7 @@ type Mixed struct {
 }
 
 // Join forwards to the wrapped joiner.
-func (m *Mixed) Join(parts []string) string { // want `only forwards its arguments to m\.in\.Join`
+func (m *Mixed) Join(parts []string) string { // want `^\[agent\] method Mixed\.Join only forwards its arguments to m\.in\.Join`
 	return m.in.Join(parts)
 }
 

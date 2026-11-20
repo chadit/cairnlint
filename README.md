@@ -102,17 +102,20 @@ usage patterns, and decide what's a real issue. A human
 would find the noise distracting.
 
 When agent mode is active, agent diagnostics are written
-to a temp file at `/tmp/cairnlint-agent-<PID>.txt`
-instead of stdout. A single summary line is printed to
-stderr:
+to a temp file at `$TMPDIR/cairnlint-agent-<PID>.txt`
+instead of stderr. The directory is the one Go's
+`os.TempDir()` returns: `$TMPDIR` when set, otherwise
+`/tmp`. On macOS that's a per-user path under
+`/var/folders`. A single summary line is printed to
+stderr with the full path:
 
 ```text
-[agent] heuristic findings written to /tmp/cairnlint-agent-12345.txt
+[agent] heuristic findings written to $TMPDIR/cairnlint-agent-12345.txt
 ```
 
-Standard diagnostics still go to stdout as usual. A run
+Standard diagnostics still go to stderr as usual. A run
 with no agent findings writes no file. If the temp file
-can't be written, agent diagnostics fall back to stdout.
+can't be written, agent diagnostics fall back to stderr.
 
 ### Enabling agent mode
 
@@ -199,7 +202,7 @@ The LLM's workflow looks like this:
 1. Run `cairnlint ./...` (agent mode activates via env
    or flag)
 2. See the stderr summary: `[agent] heuristic findings
-   written to /tmp/cairnlint-agent-<PID>.txt`
+   written to $TMPDIR/cairnlint-agent-<PID>.txt`
 3. Read the file to see full diagnostics
 4. For each finding, check whether the flagged symbol has
    legitimate non-test consumers (e.g. `rg "SymbolName"

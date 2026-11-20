@@ -1,7 +1,7 @@
 package agentloneimpl
 
 // Storer loads a record by id.
-type Storer interface { // want `exactly one implementing type in this package \(fileStore\)`
+type Storer interface { // want `^\[agent\] interface Storer has exactly one implementing type in this package \(fileStore\)`
 	Load(id string) ([]byte, error)
 }
 

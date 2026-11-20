@@ -3,7 +3,7 @@ package agentloneparam
 import "fmt"
 
 // render is called three times and strict is true every time.
-func render(tpl string, strict bool) string { // want `parameter strict of render receives true at all 3 call sites`
+func render(tpl string, strict bool) string { // want `^\[agent\] parameter strict of render receives true at all 3 call sites`
 	if strict {
 		return "strict:" + tpl
 	}

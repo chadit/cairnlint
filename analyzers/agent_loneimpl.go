@@ -189,7 +189,7 @@ func reportLoneImpl(pass *analysis.Pass, decl declaredInterface, implementers []
 		return
 	}
 
-	pass.Reportf(decl.pos, "interface %s has exactly one implementing type in this package (%s) and no test double; using %s directly removes the interface and the indirection at its call sites", decl.name, sole, sole)
+	pass.Reportf(decl.pos, "[agent] interface %s has exactly one implementing type in this package (%s) and no test double; using %s directly removes the interface and the indirection at its call sites", decl.name, sole, sole)
 }
 
 // A type satisfying the interface both as a value and through its pointer is

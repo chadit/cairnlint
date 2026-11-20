@@ -3,7 +3,6 @@ package analyzers
 import (
 	"go/ast"
 	"go/types"
-	"strings"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -11,6 +10,14 @@ import (
 // nilArgument is the key a nil argument contributes to the shared-value
 // comparison, since an untyped nil carries no constant.Value to compare.
 const nilArgument = "nil"
+
+// constantArg is one call-site argument known at compile time. key is the
+// exact text, so arguments that differ anywhere never compare equal; display
+// is the short form printed in the diagnostic.
+type constantArg struct {
+	key     string
+	display string
+}
 
 type calleeUsage struct {
 	decl    *ast.FuncDecl
@@ -183,7 +190,7 @@ func reportLoneParams(pass *analysis.Pass, callee *types.Func, seen *calleeUsage
 			continue
 		}
 
-		pass.Reportf(name.Pos(), "parameter %s of %s receives %s at all %d call sites in this package; the choice it encodes is never made", name.Name, callee.Name(), shared, len(seen.callSet))
+		pass.Reportf(name.Pos(), "[agent] parameter %s of %s receives %s at all %d call sites in this package; the choice it encodes is never made", name.Name, callee.Name(), shared, len(seen.callSet))
 	}
 }
 
@@ -208,46 +215,39 @@ func paramPositions(funcDecl *ast.FuncDecl) map[int]*ast.Ident {
 }
 
 func sharedConstant(pass *analysis.Pass, callSet [][]ast.Expr, index int) (string, bool) {
-	var shared string
+	var shared constantArg
 
 	for _, args := range callSet {
 		if index >= len(args) {
 			return "", false
 		}
 
-		value, isConst := constantKey(pass, args[index])
-		if !isConst || (shared != "" && value != shared) {
+		arg, isConst := constantOf(pass, args[index])
+		if !isConst || (shared.key != "" && arg.key != shared.key) {
 			return "", false
 		}
 
-		shared = value
+		shared = arg
 	}
 
-	return shared, shared != ""
+	return shared.display, shared.key != ""
 }
 
-func constantKey(pass *analysis.Pass, arg ast.Expr) (string, bool) {
+// String rather than ExactString for display: a rational prints as a decimal
+// instead of a fraction, and a string over 72 characters is cut with "...".
+func constantOf(pass *analysis.Pass, arg ast.Expr) (constantArg, bool) {
 	info, known := pass.TypesInfo.Types[arg]
 	if !known {
-		return "", false
+		return constantArg{}, false
 	}
 
 	if info.Value != nil {
-		return trimConstant(info.Value.ExactString()), true
+		return constantArg{key: info.Value.ExactString(), display: info.Value.String()}, true
 	}
 
 	if info.IsNil() {
-		return nilArgument, true
+		return constantArg{key: nilArgument, display: nilArgument}, true
 	}
 
-	return "", false
-}
-
-// A rational constant prints as a fraction, which reads badly in a diagnostic.
-func trimConstant(exact string) string {
-	if strings.Contains(exact, "/") {
-		return strings.SplitN(exact, "/", 2)[0]
-	}
-
-	return exact
+	return constantArg{}, false
 }

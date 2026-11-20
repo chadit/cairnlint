@@ -121,13 +121,13 @@ func (index *passthroughIndex) report(pass *analysis.Pass, recv string, methods 
 
 	pos, known := index.typePos[recv]
 	if known && methods.total == len(methods.forward) && singleFieldStruct(pass, recv) {
-		pass.Reportf(pos, "type %s wraps one field and every one of its %d methods forwards; callers can hold the wrapped value directly", recv, methods.total)
+		pass.Reportf(pos, "[agent] type %s wraps one field and every one of its %d methods forwards; callers can hold the wrapped value directly", recv, methods.total)
 
 		return
 	}
 
 	for _, method := range methods.forward {
-		pass.Reportf(method.pos, "method %s.%s only forwards its arguments to %s and adds no behavior of its own", recv, method.name, method.target)
+		pass.Reportf(method.pos, "[agent] method %s.%s only forwards its arguments to %s and adds no behavior of its own", recv, method.name, method.target)
 	}
 }
 

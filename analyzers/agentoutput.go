@@ -61,9 +61,9 @@ func (writer *agentFileWriter) writeLine(line string) error {
 
 // wrapAgentFileOutput redirects agent diagnostics to a temp file and prints
 // one stderr line on the first finding so the caller knows where to look. A
-// diagnostic the file cannot take falls back to stdout. It replaces
-// pass.Report without forwarding, so it must be the outermost wrapper; enter
-// through WrapForAgentFile.
+// diagnostic the file cannot take falls back to pass.Report, which the driver
+// prints to stderr. It replaces pass.Report without forwarding, so it must be
+// the outermost wrapper; enter through WrapForAgentFile.
 func wrapAgentFileOutput(all []*analysis.Analyzer) []*analysis.Analyzer {
 	writer := newAgentFileWriter()
 
