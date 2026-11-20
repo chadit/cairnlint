@@ -607,6 +607,7 @@ is not. A literal passed straight to `WriteHeader`,
 | `godebugremoved` | `//go:debug` naming a setting removed in Go 1.27 |
 | `namedresultuse` | Named result assigned in the body or returned bare (doc-only names and defer assignment are fine) |
 | `paramlimit` | More than 3 domain parameters in a function, method, interface method, or struct field whose type is a func type literal. Func literals, named func types, and files under a `mocks/` directory are not checked. Context, one logger, testing handles, func-typed parameters, and a variadic parameter whose element is a func or a type whose name ends in `Option` do not count. A signature that an outside interface or func type fixes is still reported, so silence it with `//nolint:paramlimit` |
+| `singlecallwrapper` | Unexported function, with no receiver and no type parameters, whose whole body is `return pkg.F(...)` where `pkg.F` is a function another package declares, every parameter reaches the call once, unchanged and in order (a variadic one through `...`), and every other argument is a constant, `nil`, or a package-level name. Call `pkg.F` directly at each caller. A function with no parameters, one that changes the result type, one used as a func value, a `//go:linkname` target, and one a file for another platform declares too are not reported. Test files are read too |
 
 ### Naming
 

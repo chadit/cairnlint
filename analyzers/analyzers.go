@@ -111,6 +111,7 @@ func Categories() []Category {
 				goDebugRemovedAnalyzer(),
 				namedResultUseAnalyzer(),
 				paramLimitAnalyzer(),
+				singleCallWrapperAnalyzer(),
 			},
 		},
 		{
