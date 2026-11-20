@@ -158,7 +158,7 @@ func isTrivialResult(pass *analysis.Pass, expr ast.Expr) bool {
 	case *ast.CallExpr:
 		_, isCanned := cannedErrorLiteral(pass, typed)
 
-		return isCanned
+		return isCanned && fixedErrorArgs(pass, typed)
 	}
 
 	return false
@@ -184,6 +184,21 @@ func cannedErrorLiteral(pass *analysis.Pass, call *ast.CallExpr) (string, bool) 
 	}
 
 	return strings.Trim(lit.Value, "`\""), true
+}
+
+// fixedErrorArgs reports whether every argument after the message is a
+// constant, nil, or a package-level name. An error that wraps a value passed
+// in, such as err, depends on its input and is not canned. The "not
+// implemented" check skips this test, since its message marks a stub whatever
+// the arguments carry.
+func fixedErrorArgs(pass *analysis.Pass, call *ast.CallExpr) bool {
+	for _, arg := range call.Args[1:] {
+		if !isFixedArg(pass, arg) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // hasErrorResult reports whether funcDecl declares a result of the builtin error

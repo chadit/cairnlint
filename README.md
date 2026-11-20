@@ -286,10 +286,12 @@ each call site, and the unreachable half of the body come
 out together. Only unexported callees with two or more
 call sites are considered, and a callee whose name is
 ever used as a value is skipped because its arguments are
-then invisible. `unparam` is the closest existing check,
-but it reports nothing for this shape in practice, and
-revive's `unused-parameter` covers only the case where
-the body ignores the parameter outright.
+then invisible. `unparam` reports the same finding once
+a callee has four or more call sites, but it skips a
+callee with two or three call sites, and it skips a
+callee whose body is a stub at any count; revive's
+`unused-parameter` covers only the case where the body
+ignores the parameter outright.
 
 ### Adding a new agent-only analyzer
 

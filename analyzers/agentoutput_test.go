@@ -101,3 +101,24 @@ func TestAgentFileReplacesStaleFile(t *testing.T) {
 		t.Fatalf("agent file has %d findings, want this run's 2:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 }
+
+// TestAgentFileWritesEachFindingOnce verifies a finding in a non-test file of
+// a package with tests lands in the agent file once. The driver analyzes that
+// file in the plain package and in its test variant, and prints the standard
+// tier once, so the agent tier has to match.
+func TestAgentFileWritesEachFindingOnce(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+
+	wrapped := analyzers.WrapForAgentFile([]*analysis.Analyzer{findAgentAnalyzer("agentstubbody")})
+	analysistest.Run(t, analysistest.TestData(), wrapped[0], "agentoutputdup")
+
+	matches, err := filepath.Glob(filepath.Join(os.TempDir(), "*-agent-*.txt"))
+	if err != nil {
+		t.Fatalf("glob agent files: %v", err)
+	}
+
+	lines := readAgentFile(t, matches)
+	if len(lines) != 1 || !strings.Contains(lines[0], "stub.go:6:") {
+		t.Fatalf("agent file has %d findings, want the Validate stub once:\n%s", len(lines), strings.Join(lines, "\n"))
+	}
+}

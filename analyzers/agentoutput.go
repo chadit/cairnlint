@@ -20,24 +20,40 @@ const agentFileMode = 0o600
 // construction would leave an empty file after a clean run. Each line opens,
 // writes, and closes the file under mu instead.
 type agentFileWriter struct {
+	written     map[agentFinding]bool
 	path        string
 	mu          sync.Mutex
 	summaryOnce sync.Once
 	opened      bool
 }
 
+// agentFinding keys a written line the way the driver's printer keys a
+// diagnostic, by analyzer and printed text. The driver analyzes a package's
+// non-test files again in its test variant and prints the repeat once; this
+// writer bypasses that printer, so it skips the repeat itself.
+type agentFinding struct {
+	analyzer string
+	line     string
+}
+
 func newAgentFileWriter() *agentFileWriter {
 	return &agentFileWriter{
-		path: filepath.Join(os.TempDir(), fmt.Sprintf("cairnlint-agent-%d.txt", os.Getpid())),
+		path:    filepath.Join(os.TempDir(), fmt.Sprintf("cairnlint-agent-%d.txt", os.Getpid())),
+		written: make(map[agentFinding]bool),
 	}
 }
 
-// writeLine appends line to the agent file, creating it on the first call.
-// The first open also truncates, so a file an earlier process with the same
-// PID left behind does not carry its findings into this run.
-func (writer *agentFileWriter) writeLine(line string) error {
+// writeLine appends finding's line to the agent file, creating it on the
+// first call, and does nothing for a finding already written. The first open
+// also truncates, so a file an earlier process with the same PID left behind
+// does not carry its findings into this run.
+func (writer *agentFileWriter) writeLine(finding agentFinding) error {
 	writer.mu.Lock()
 	defer writer.mu.Unlock()
+
+	if writer.written[finding] {
+		return nil
+	}
 
 	flags := os.O_APPEND | os.O_CREATE | os.O_WRONLY
 	if !writer.opened {
@@ -51,10 +67,12 @@ func (writer *agentFileWriter) writeLine(line string) error {
 
 	writer.opened = true
 
-	_, writeErr := fmt.Fprintln(file, line)
+	_, writeErr := fmt.Fprintln(file, finding.line)
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return fmt.Errorf("write agent file %s: %w", writer.path, err)
 	}
+
+	writer.written[finding] = true
 
 	return nil
 }
@@ -92,7 +110,7 @@ func wrapAgentOut(orig *analysis.Analyzer, writer *agentFileWriter) *analysis.An
 
 		filteredPass.Report = func(diag analysis.Diagnostic) {
 			pos := pass.Fset.Position(diag.Pos)
-			if err := writer.writeLine(fmt.Sprintf("%s: %s", pos, diag.Message)); err != nil {
+			if err := writer.writeLine(agentFinding{analyzer: orig.Name, line: fmt.Sprintf("%s: %s", pos, diag.Message)}); err != nil {
 				// Losing the finding would be worse than mixing it into stdout.
 				pass.Report(diag)
 
