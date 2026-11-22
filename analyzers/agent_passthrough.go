@@ -8,7 +8,11 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
+// inner is the type of the value the method forwards to, nil when the call
+// goes to a package-level function: a package qualifier has no entry in
+// TypesInfo.Types, while TypeOf would give the invalid type.
 type passthroughMethod struct {
+	inner  types.Type
 	name   string
 	target string
 	pos    token.Pos
@@ -27,13 +31,14 @@ type receiverMethods struct {
 type passthroughIndex struct {
 	byReceiver map[string]*receiverMethods
 	typePos    map[string]token.Pos
+	required   map[string][]*types.Interface
 }
 
 // agentPassthroughAnalyzer flags methods that only forward their arguments to
-// another value, and types whose every method does so (Fowler's Middle Man).
-// It is agent-only because forwarding is sometimes the point, as in a boundary
-// adapter, a method satisfying an external interface, or a facade narrowing a
-// wide type, and only an LLM can weigh the caller's reason.
+// another value, and types whose every method does so (Fowler's Middle Man),
+// skipping forwarders an interface requires. It is agent-only because
+// forwarding is still sometimes the point, as in a boundary adapter or a
+// facade narrowing a wide type, and only an LLM can weigh the reason.
 func agentPassthroughAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name: "agentpassthrough",
@@ -52,6 +57,10 @@ func runAgentPassthrough(pass *analysis.Pass) (any, error) {
 		index.collect(pass, file)
 	}
 
+	if index.hasForwards() {
+		index.required = interfacesByMethod(pass)
+	}
+
 	for recv, methods := range index.byReceiver {
 		index.report(pass, recv, methods)
 	}
@@ -66,7 +75,7 @@ func (index *passthroughIndex) collect(pass *analysis.Pass, file *ast.File) {
 
 	for _, decl := range file.Decls {
 		recordTypePositions(decl, index.typePos)
-		recordMethod(decl, index.byReceiver)
+		recordMethod(pass, decl, index.byReceiver)
 	}
 }
 
@@ -85,7 +94,7 @@ func recordTypePositions(decl ast.Decl, typePos map[string]token.Pos) {
 	}
 }
 
-func recordMethod(decl ast.Decl, byReceiver map[string]*receiverMethods) {
+func recordMethod(pass *analysis.Pass, decl ast.Decl, byReceiver map[string]*receiverMethods) {
 	funcDecl, isFunc := decl.(*ast.FuncDecl)
 	if !isFunc || funcDecl.Recv == nil || funcDecl.Body == nil {
 		return
@@ -104,9 +113,14 @@ func recordMethod(decl ast.Decl, byReceiver map[string]*receiverMethods) {
 
 	methods.total++
 
-	target, forwards := forwardTarget(funcDecl)
+	sel, forwards := forwardTarget(funcDecl)
 	if forwards {
-		methods.forward = append(methods.forward, passthroughMethod{name: funcDecl.Name.Name, target: target, pos: funcDecl.Name.Pos()})
+		methods.forward = append(methods.forward, passthroughMethod{
+			inner:  pass.TypesInfo.Types[sel.X].Type,
+			name:   funcDecl.Name.Name,
+			target: renderSelector(sel),
+			pos:    funcDecl.Name.Pos(),
+		})
 	}
 }
 
@@ -115,18 +129,19 @@ func recordMethod(decl ast.Decl, byReceiver map[string]*receiverMethods) {
 // or the other keeps a wrapper with eight methods from producing eight
 // diagnostics that all say the same thing.
 func (index *passthroughIndex) report(pass *analysis.Pass, recv string, methods *receiverMethods) {
-	if len(methods.forward) == 0 {
+	forward := index.removableForwards(pass, recv, methods.forward)
+	if len(forward) == 0 {
 		return
 	}
 
 	pos, known := index.typePos[recv]
-	if known && methods.total == len(methods.forward) && singleFieldStruct(pass, recv) {
+	if known && methods.total == len(forward) && singleFieldStruct(pass, recv) {
 		pass.Reportf(pos, "[agent] type %s wraps one field and every one of its %d methods forwards; callers can hold the wrapped value directly", recv, methods.total)
 
 		return
 	}
 
-	for _, method := range methods.forward {
+	for _, method := range forward {
 		pass.Reportf(method.pos, "[agent] method %s.%s only forwards its arguments to %s and adds no behavior of its own", recv, method.name, method.target)
 	}
 }
@@ -174,22 +189,18 @@ func receiverTypeName(funcDecl *ast.FuncDecl) (string, bool) {
 
 // A body that branches, reshapes an argument, or handles an error is doing
 // work, so only a bare single call counts as a forward.
-func forwardTarget(funcDecl *ast.FuncDecl) (string, bool) {
+func forwardTarget(funcDecl *ast.FuncDecl) (*ast.SelectorExpr, bool) {
 	call, isSingleCall := soleCall(funcDecl.Body)
 	if !isSingleCall {
-		return "", false
+		return nil, false
 	}
 
 	sel, isSel := call.Fun.(*ast.SelectorExpr)
-	if !isSel {
-		return "", false
+	if !isSel || !forwardsAllParams(funcDecl, call) {
+		return nil, false
 	}
 
-	if !forwardsAllParams(funcDecl, call) {
-		return "", false
-	}
-
-	return renderSelector(sel), true
+	return sel, true
 }
 
 func soleCall(body *ast.BlockStmt) (*ast.CallExpr, bool) {
@@ -267,4 +278,88 @@ func renderSelector(sel *ast.SelectorExpr) string {
 	}
 
 	return sel.Sel.Name
+}
+
+// Indexing every imported interface costs more than the rest of the pass, so
+// it waits until some method forwards.
+func (index *passthroughIndex) hasForwards() bool {
+	for _, methods := range index.byReceiver {
+		if len(methods.forward) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+// A forwarder is not removable when an interface the type implements declares
+// that method and the inner value does not implement that interface, because
+// the inner value cannot stand in for the wrapper. When the inner value
+// implements it too, the wrapper can go and the forward stands.
+func (index *passthroughIndex) removableForwards(pass *analysis.Pass, recv string, forward []passthroughMethod) []passthroughMethod {
+	wrapperType := pass.Pkg.Scope().Lookup(recv)
+	if wrapperType == nil {
+		return forward
+	}
+
+	var removable []passthroughMethod
+
+	for _, method := range forward {
+		if !index.requiredBy(wrapperType.Type(), method) {
+			removable = append(removable, method)
+		}
+	}
+
+	return removable
+}
+
+func (index *passthroughIndex) requiredBy(wrapperType types.Type, method passthroughMethod) bool {
+	for _, iface := range index.required[method.name] {
+		if !implementsByValueOrPointer(wrapperType, iface) {
+			continue
+		}
+
+		if method.inner == nil || !implementsByValueOrPointer(method.inner, iface) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// interfacesByMethod indexes the named interfaces declared in the package and
+// in the packages it imports, standard library included, by method name. An
+// empty interface, a type-set constraint, and a generic interface require no
+// method a concrete type can be checked against, so they are left out.
+func interfacesByMethod(pass *analysis.Pass) map[string][]*types.Interface {
+	byMethod := make(map[string][]*types.Interface)
+
+	for _, pkg := range append([]*types.Package{pass.Pkg}, pass.Pkg.Imports()...) {
+		for _, name := range pkg.Scope().Names() {
+			addInterfaceMethods(byMethod, pkg.Scope().Lookup(name))
+		}
+	}
+
+	return byMethod
+}
+
+func addInterfaceMethods(byMethod map[string][]*types.Interface, obj types.Object) {
+	typeName, isType := obj.(*types.TypeName)
+	if !isType {
+		return
+	}
+
+	named, isNamed := typeName.Type().(*types.Named)
+	if !isNamed || named.TypeParams().Len() > 0 {
+		return
+	}
+
+	iface, isIface := named.Underlying().(*types.Interface)
+	if !isIface || !iface.IsMethodSet() {
+		return
+	}
+
+	for method := range iface.Methods() {
+		byMethod[method.Name()] = append(byMethod[method.Name()], iface)
+	}
 }

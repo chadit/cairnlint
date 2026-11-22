@@ -199,5 +199,11 @@ func implementsInterface(typeName *types.TypeName, decl declaredInterface) bool 
 		return false
 	}
 
-	return types.Implements(typeName.Type(), decl.iface) || types.Implements(types.NewPointer(typeName.Type()), decl.iface)
+	return implementsByValueOrPointer(typeName.Type(), decl.iface)
+}
+
+// Methods declared on *T count, since a caller holding the address of a T
+// value can use it wherever the interface is wanted.
+func implementsByValueOrPointer(typ types.Type, iface *types.Interface) bool {
+	return types.Implements(typ, iface) || types.Implements(types.NewPointer(typ), iface)
 }

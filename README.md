@@ -273,10 +273,17 @@ legitimately clears the finding.
 call forwarding every parameter onward, and reports at
 the type instead when a one-field struct's whole method
 set forwards. Fowler calls the type-level shape a Middle
-Man. Thin forwarding is sometimes the point (an adapter
-at a package boundary, a method promoted to satisfy an
-external interface), so the analyzer reports the shape
-and leaves the reason to the LLM.
+Man. A forwarder is not reported when an interface the
+type implements declares that method and the inner value
+does not implement that interface, because the inner
+value cannot stand in for the wrapper. It is still
+reported when the inner value implements that interface
+too. The interfaces checked are the named ones
+declared in the package and in the packages it imports,
+the standard library included. Other thin forwarding is
+sometimes the point (an adapter at a package boundary),
+so the analyzer reports the shape and leaves the reason
+to the LLM.
 
 `agentloneparam` flags a parameter given the same
 constant at every call site in the package. A parameter
