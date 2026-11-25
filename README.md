@@ -124,6 +124,11 @@ run first removes the `cairnlint-agent-<PID>.txt` files
 in that directory that are more than a day old, and
 silently skips any it can't remove.
 
+The file is readable only by its owner (mode 0600). On
+Linux and macOS, cairnlint also refuses anything at that
+path other than a regular file, such as a symlink or a
+FIFO someone else planted there.
+
 Standard diagnostics still go to stderr as usual. A run
 with no agent findings writes no file. If the temp file
 can't be written, agent diagnostics fall back to stderr.

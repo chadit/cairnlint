@@ -112,7 +112,9 @@ func (writer *agentFileWriter) writeLine(finding agentFinding) error {
 		return nil
 	}
 
-	flags := os.O_APPEND | os.O_CREATE | os.O_WRONLY
+	// The path is predictable, so agentOpenFlags refuse what someone else may
+	// have planted there, and a refused finding falls back to stderr instead.
+	flags := os.O_APPEND | os.O_CREATE | os.O_WRONLY | agentOpenFlags
 	if !writer.opened {
 		flags |= os.O_TRUNC
 	}
@@ -120,6 +122,25 @@ func (writer *agentFileWriter) writeLine(finding agentFinding) error {
 	file, err := os.OpenFile(writer.path, flags, agentFileMode)
 	if err != nil {
 		return fmt.Errorf("open agent file: %w", err)
+	}
+
+	// A FIFO with a reader or a device still opens, so only a regular file
+	// is written to.
+	info, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("stat agent file %s: %w", writer.path, errors.Join(err, file.Close()))
+	}
+
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("agent file %s: %w", writer.path, errors.Join(errNotRegularFile, file.Close()))
+	}
+
+	// OpenFile's mode applies only when it creates the file, so a leftover
+	// file from a reused PID keeps its old mode until this resets it.
+	if !writer.opened {
+		if err := file.Chmod(agentFileMode); err != nil {
+			return fmt.Errorf("restrict agent file %s: %w", writer.path, errors.Join(err, file.Close()))
+		}
 	}
 
 	writer.opened = true

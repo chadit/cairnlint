@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 )
 
 // The exit codes a caller of cairnlint can see.
@@ -107,10 +108,39 @@ type toolRun struct {
 func runTool(t *testing.T, dir string, env []string, args ...string) toolRun {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-
 	cmd := exec.CommandContext(t.Context(), binaryPath, args...)
 	cmd.Dir = dir
+
+	return runCommand(t, cmd, env)
+}
+
+// runAgentToolAfter runs cairnlint in agent mode from dir like runTool, after
+// a shell script that then execs it. The script sees the run's TMPDIR, and
+// $$ there is cairnlint's PID, so it can plant an entry at the agent file path.
+func runAgentToolAfter(t *testing.T, before, dir string, args ...string) toolRun {
+	t.Helper()
+
+	script := []string{"-c", before + "\nexec \"$@\"", "sh", binaryPath}
+
+	// A planted entry can make a broken writer block forever, so the run gets
+	// a deadline and fails instead of hanging the suite.
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	t.Cleanup(cancel)
+
+	cmd := exec.CommandContext(ctx, "sh", slices.Concat(script, args)...)
+	cmd.Dir = dir
+	cmd.WaitDelay = 5 * time.Second
+
+	return runCommand(t, cmd, []string{agentModeOn})
+}
+
+// runCommand runs cmd with TMPDIR at a fresh directory and env applied last,
+// so env can replace TMPDIR, and collects what the run left.
+func runCommand(t *testing.T, cmd *exec.Cmd, env []string) toolRun {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
 	cmd.Env = slices.Concat(callerEnvironment(), []string{"TMPDIR=" + tmpDir}, env)
 
 	var stdout, stderr bytes.Buffer
@@ -152,15 +182,29 @@ func readAgentFiles(t *testing.T, dir string) string {
 	contents := make([]string, 0, len(paths))
 
 	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read agent file: %v", err)
-		}
-
-		contents = append(contents, string(data))
+		contents = append(contents, readRegularFile(t, path))
 	}
 
 	return strings.Join(contents, "")
+}
+
+// readRegularFile returns path's contents, or "" when a test planted
+// something other than a regular file there: reading a FIFO with no writer
+// would block forever.
+func readRegularFile(t *testing.T, path string) string {
+	t.Helper()
+
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return ""
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read agent file: %v", err)
+	}
+
+	return string(data)
 }
 
 // writeModule writes files, keyed by slash-separated path, into a fresh module
