@@ -66,3 +66,13 @@ type Reordered struct{ in *inner }
 func (r *Reordered) Join(parts []string) string {
 	return r.in.Join(append([]string{"head"}, parts...))
 }
+
+// Single holds one field and forwards its only method to it.
+type Single struct { // want `^\[agent\] type Single wraps one field and its only method forwards; callers can hold the wrapped value directly$`
+	in *inner
+}
+
+// Sep forwards to the wrapped joiner.
+func (s *Single) Sep() string {
+	return s.in.Sep()
+}

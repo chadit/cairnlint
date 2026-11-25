@@ -2,9 +2,11 @@ package analyzers
 
 import (
 	"go/ast"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -45,10 +47,10 @@ func runAgentLoneImpl(pass *analysis.Pass) (any, error) {
 }
 
 // skipUncountablePass drops passes whose per-package use count would be wrong
-// or duplicated. An external test package declares nothing worth counting. The
-// plain variant of a package with _test.go files is skipped because its
-// augmented variant also sees the test files, whose declarations and calls
-// belong in the count.
+// or duplicated. An external test package declares nothing worth counting.
+// With in-package _test.go files the plain variant is skipped, since the
+// augmented variant also counts those files. External test files make no
+// augmented variant, so the plain variant must report.
 func skipUncountablePass(pass *analysis.Pass) bool {
 	if pass.Pkg == nil || strings.HasSuffix(pass.Pkg.Name(), "_test") {
 		return true
@@ -58,10 +60,14 @@ func skipUncountablePass(pass *analysis.Pass) bool {
 		return false
 	}
 
-	return packageDirHasTests(pass)
+	return packageDirHasInternalTests(pass)
 }
 
-func packageDirHasTests(pass *analysis.Pass) bool {
+// packageDirHasInternalTests reports whether the package's directory holds a
+// _test.go file that belongs to the package itself rather than to its
+// external _test package, and that the build includes. A file the build
+// leaves out by tag or GOOS makes no test variant either.
+func packageDirHasInternalTests(pass *analysis.Pass) bool {
 	if len(pass.Files) == 0 {
 		return false
 	}
@@ -73,7 +79,20 @@ func packageDirHasTests(pass *analysis.Pass) bool {
 		return false
 	}
 
-	return len(matches) > 0
+	return slices.ContainsFunc(matches, func(path string) bool {
+		return !slices.Contains(pass.IgnoredFiles, path) && testFilePackage(path) == pass.Pkg.Name()
+	})
+}
+
+// testFilePackage returns the package name a test file declares, or "" when
+// its package clause cannot be read.
+func testFilePackage(path string) string {
+	file, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.PackageClauseOnly)
+	if err != nil {
+		return ""
+	}
+
+	return file.Name.Name
 }
 
 func declaredInterfaces(pass *analysis.Pass) []declaredInterface {

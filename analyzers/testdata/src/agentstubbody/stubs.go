@@ -20,7 +20,7 @@ func ValidateConfig(c int) error { // want `returns without doing the work its s
 }
 
 // LoadUser fetches the user identified by id.
-func LoadUser(id string) (*int, error) { // want `stub: wire up a real implementation`
+func LoadUser(id string) (*int, error) { // want `is a stub \(".+"\): wire up a real implementation`
 	return nil, errors.New("not implemented")
 }
 
@@ -34,7 +34,7 @@ func Size() int { // want `returns a canned value; verify it does what its doc c
 }
 
 // Save persists the record.
-func (s *Store) Save() error { // want `stub: wire up a real implementation`
+func (s *Store) Save() error { // want `is a stub \(".+"\): wire up a real implementation`
 	return fmt.Errorf("TODO: implement Save")
 }
 

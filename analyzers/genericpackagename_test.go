@@ -6,10 +6,11 @@ import (
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
-// TestGenericPackageName verifies the genericpackagename analyzer flags vague package names like util.
+// TestGenericPackageName verifies the genericpackagename analyzer flags vague
+// package names like util and leaves a specific name such as netutil alone.
 func TestGenericPackageName(t *testing.T) {
 	t.Parallel()
 
 	testdata := analysistest.TestData()
-	analysistest.Run(t, testdata, findAnalyzer("genericpackagename"), "genericpackagename")
+	analysistest.Run(t, testdata, findAnalyzer("genericpackagename"), "genericpackagename", "genericpackagename/netutil")
 }

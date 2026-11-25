@@ -1,6 +1,7 @@
 package analyzers
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -124,6 +125,16 @@ func recordMethod(pass *analysis.Pass, decl ast.Decl, byReceiver map[string]*rec
 	}
 }
 
+// forwardsPhrase says that all count methods forward, in the singular for one
+// method so the message never reads "its 1 methods".
+func forwardsPhrase(count int) string {
+	if count == 1 {
+		return "its only method forwards"
+	}
+
+	return fmt.Sprintf("every one of its %d methods forwards", count)
+}
+
 // report emits the type-level finding when every method forwards
 // out of a single field, and the per-method finding otherwise. Reporting one
 // or the other keeps a wrapper with eight methods from producing eight
@@ -136,7 +147,7 @@ func (index *passthroughIndex) report(pass *analysis.Pass, recv string, methods 
 
 	pos, known := index.typePos[recv]
 	if known && methods.total == len(forward) && singleFieldStruct(pass, recv) {
-		pass.Reportf(pos, "[agent] type %s wraps one field and every one of its %d methods forwards; callers can hold the wrapped value directly", recv, methods.total)
+		pass.Reportf(pos, "[agent] type %s wraps one field and %s; callers can hold the wrapped value directly", recv, forwardsPhrase(methods.total))
 
 		return
 	}

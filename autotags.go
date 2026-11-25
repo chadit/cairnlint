@@ -11,10 +11,9 @@ import (
 	"strings"
 )
 
-// AutoTagsSentinel is the -tags value that triggers discovery and a
+// autoTagsSentinel is the -tags value that triggers discovery and a
 // multi-pass lint across every user-defined build tag found in the tree.
-// Exported so lint.sh and other drivers can reference the constant name.
-const AutoTagsSentinel = "auto"
+const autoTagsSentinel = "auto"
 
 // reservedBuildTags lists identifiers in //go:build lines that are not
 // user-defined tags. GOOS and GOARCH values and compiler or feature names such
@@ -41,12 +40,12 @@ var reservedBuildTags = map[string]struct{}{ //nolint:gochecknoglobals // immuta
 	"gc": {}, "gccgo": {}, "purego": {}, "ignore": {},
 }
 
-// DiscoverBuildTags walks the source tree rooted at patterns and returns
+// discoverBuildTags walks the source tree rooted at patterns and returns
 // the sorted set of user-defined build tags referenced by //go:build (or
 // legacy // +build) constraints. Reserved identifiers (GOOS, GOARCH,
 // compiler pseudo-tags, go1.* version tags) are filtered out so the
 // caller can trust every returned value is worth a separate lint pass.
-func DiscoverBuildTags(patterns []string) ([]string, error) {
+func discoverBuildTags(patterns []string) ([]string, error) {
 	roots, err := patternRoots(patterns)
 	if err != nil {
 		return nil, err

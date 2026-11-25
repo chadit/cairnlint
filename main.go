@@ -34,14 +34,14 @@ func main() {
 	// golang.org/x/tools go/analysis/internal/analysisflags/flags.go).
 	// Packages gated by //go:build <tag> would otherwise look empty to
 	// go/packages and trigger "matched no packages".
-	tagsFlag := ConsumeTagsFlag()
+	tagsFlag := consumeTagsFlag()
 
 	// -tags=auto triggers the multi-pass auto-discovery runner before
 	// the normal single-pass flow takes over. The runner re-execs this
 	// binary once per discovered user tag (plus a default-build pass),
 	// so every lint rule fires against every build configuration without
 	// callers having to enumerate tags in their lint.sh.
-	if tagsFlag == AutoTagsSentinel {
+	if tagsFlag == autoTagsSentinel {
 		exe, err := os.Executable()
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "cairnlint: resolve executable: %v\n", err)
@@ -49,7 +49,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		os.Exit(RunAutoTagsPasses(context.Background(), &AutoTagsRun{
+		os.Exit(runAutoTagsPasses(context.Background(), &autoTagsRun{
 			Stdout:     os.Stdout,
 			Stderr:     os.Stderr,
 			Executable: exe,
@@ -58,7 +58,7 @@ func main() {
 	}
 
 	if tagsFlag != "" {
-		if err := PropagateBuildTags(tagsFlag); err != nil {
+		if err := propagateBuildTags(tagsFlag); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "cairnlint: propagate -tags: %v\n", err)
 
 			os.Exit(1)
@@ -76,6 +76,10 @@ func main() {
 
 	agentMode := consumeAgentFlag() || analyzers.DetectAgentCaller()
 	if agentMode {
+		// Here rather than in the agent file writer, which runs only when a
+		// finding arrives, because the sweep must also run on a clean run.
+		analyzers.SweepStaleAgentFiles()
+
 		all = append(all, analyzers.WrapForAgentFile(analyzers.AgentOnly())...)
 	}
 
@@ -155,11 +159,11 @@ func consumeAgentFlag() bool {
 	return found
 }
 
-// ConsumeTagsFlag removes -tags=<value>, --tags=<value>, -tags <value>, and
+// consumeTagsFlag removes -tags=<value>, --tags=<value>, -tags <value>, and
 // --tags <value> from os.Args, returning the last value seen or "" if none.
 // Extraction happens before multichecker parses flags because its own -tags
 // flag is a deprecated no-op shim that swallows the value without effect.
-func ConsumeTagsFlag() string {
+func consumeTagsFlag() string {
 	var tags string
 
 	filtered := make([]string, 0, len(os.Args))
@@ -190,16 +194,15 @@ func ConsumeTagsFlag() string {
 	return tags
 }
 
-// PropagateBuildTags prepends -tags=<tags> to the GOFLAGS environment
+// propagateBuildTags appends -tags=<tags> to the GOFLAGS environment
 // variable so go/packages, which shells out to `go list`, sees them during
-// package loading. Prepending rather than replacing preserves any other
-// flags the caller already put in GOFLAGS.
-func PropagateBuildTags(tags string) error {
-	existing := os.Getenv("GOFLAGS")
-
+// package loading. Appending keeps the caller's other GOFLAGS, and because
+// the go command takes the last -tags it sees, the command-line value beats
+// a -tags already in GOFLAGS, as it does for the go command itself.
+func propagateBuildTags(tags string) error {
 	combined := "-tags=" + tags
-	if existing != "" {
-		combined = combined + " " + existing
+	if existing := os.Getenv("GOFLAGS"); existing != "" {
+		combined = existing + " " + combined
 	}
 
 	if err := os.Setenv("GOFLAGS", combined); err != nil {

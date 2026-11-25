@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/tools/go/analysis"
 )
@@ -13,6 +15,61 @@ import (
 // agentFileMode keeps findings readable only by the user who ran the linter,
 // since the file sits in a shared temp directory.
 const agentFileMode = 0o600
+
+// Agent files are named agentFilePrefix + PID + agentFileSuffix.
+const (
+	agentFilePrefix = "cairnlint-agent-"
+	agentFileSuffix = ".txt"
+)
+
+// staleAgentFileAge is how old an agent file must be before a later run
+// removes it. The caller reads its file right after the run exits, so a day
+// leaves it plenty of time while keeping the temp directory from filling up.
+const staleAgentFileAge = 24 * time.Hour
+
+// SweepStaleAgentFiles removes agent files in the temp directory whose
+// modification time is more than staleAgentFileAge ago. The tool cannot
+// delete its own file, because the caller reads it after the run, so each
+// agent-mode run clears what earlier runs left. Entries it cannot read or
+// remove, such as another user's file in a shared /tmp, are skipped silently.
+func SweepStaleAgentFiles() {
+	dir := os.TempDir()
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+
+	cutoff := time.Now().Add(-staleAgentFileAge)
+
+	for _, entry := range entries {
+		if isStaleAgentFile(entry, cutoff) {
+			_ = os.Remove(filepath.Join(dir, entry.Name()))
+		}
+	}
+}
+
+// isStaleAgentFile reports whether entry is a regular file named like an agent
+// file and last modified before cutoff. ReadDir entries describe the entry
+// itself, so a symlink is never taken for the file it points at.
+func isStaleAgentFile(entry os.DirEntry, cutoff time.Time) bool {
+	if !isAgentFileName(entry.Name()) || !entry.Type().IsRegular() {
+		return false
+	}
+
+	info, err := entry.Info()
+
+	return err == nil && info.ModTime().Before(cutoff)
+}
+
+// isAgentFileName reports whether name is agentFilePrefix, one or more
+// digits, and agentFileSuffix.
+func isAgentFileName(name string) bool {
+	pidAndSuffix, hasPrefix := strings.CutPrefix(name, agentFilePrefix)
+	pid, hasSuffix := strings.CutSuffix(pidAndSuffix, agentFileSuffix)
+
+	return hasPrefix && hasSuffix && pid != "" && strings.Trim(pid, "0123456789") == ""
+}
 
 // agentFileWriter appends agent-tier diagnostics to a per-process temp file,
 // keeping them out of the stdout stream humans and CI read. It holds no open
@@ -38,7 +95,7 @@ type agentFinding struct {
 
 func newAgentFileWriter() *agentFileWriter {
 	return &agentFileWriter{
-		path:    filepath.Join(os.TempDir(), fmt.Sprintf("cairnlint-agent-%d.txt", os.Getpid())),
+		path:    filepath.Join(os.TempDir(), fmt.Sprintf("%s%d%s", agentFilePrefix, os.Getpid(), agentFileSuffix)),
 		written: make(map[agentFinding]bool),
 	}
 }

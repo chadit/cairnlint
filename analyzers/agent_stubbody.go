@@ -94,7 +94,7 @@ func checkSingleReturn(pass *analysis.Pass, funcDecl *ast.FuncDecl, hasDoc bool)
 
 	if text, isStub := notImplementedSentinel(pass, ret); isStub {
 		pass.Reportf(funcDecl.Name.Pos(),
-			"[agent] %s %s is a %q stub: wire up a real implementation before use",
+			"[agent] %s %s is a stub (%q): wire up a real implementation before use",
 			kindOf(funcDecl), funcDecl.Name.Name, text)
 
 		return

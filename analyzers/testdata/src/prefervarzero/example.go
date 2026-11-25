@@ -42,3 +42,42 @@ func multiAssign() (int, int) {
 
 	return x, y
 }
+
+// Not flagged: an init clause cannot hold a var declaration, so the short
+// form is the only way to write these.
+func initClauses(limit int, value any) int {
+	var total int
+
+	for i := 0; i < limit; i++ {
+		total += i
+	}
+
+	if n := 0; n < limit {
+		total += n
+	}
+
+	switch s := ""; s {
+	case "":
+		total++
+	}
+
+	switch b := false; typed := value.(type) {
+	case int:
+		_ = b
+		total += typed
+	}
+
+	return total
+}
+
+// Flagged: a short declaration inside a loop body can still be a var.
+func insideLoop(limit int) int {
+	var total int
+
+	for range limit {
+		n := 0 // want `use "var n int" instead of short declaration with zero value`
+		total += n
+	}
+
+	return total
+}

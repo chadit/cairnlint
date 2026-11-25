@@ -18,7 +18,7 @@ func CloseStore(name string) error {
 }
 
 // Reserve claims the named slot.
-func Reserve(name string) error { // want `stub: wire up a real implementation`
+func Reserve(name string) error { // want `is a stub \(".+"\): wire up a real implementation`
 	return fmt.Errorf("not implemented")
 }
 
@@ -28,12 +28,12 @@ func Limit() error { // want `returns without doing the work its signature impli
 }
 
 // Prepare readies the named job.
-func Prepare(name string) error { // want `stub: wire up a real implementation`
+func Prepare(name string) error { // want `is a stub \(".+"\): wire up a real implementation`
 	return fmt.Errorf("not implemented: %s", name)
 }
 
 // Dial connects to host.
-func Dial(host string) error { // want `stub: wire up a real implementation`
+func Dial(host string) error { // want `is a stub \(".+"\): wire up a real implementation`
 	return fmt.Errorf("%s: unimplemented", host)
 }
 

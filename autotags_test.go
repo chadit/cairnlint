@@ -1,198 +1,131 @@
 package main_test
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
-	"sort"
+	"regexp"
+	"slices"
+	"strings"
 	"testing"
-
-	cairnlint "github.com/chadit/cairnlint"
 )
 
-const (
-	integrationTag  = "integration"
-	wildcardPattern = "./..."
-)
+// untaggedFile is the file every pass analyzes, whatever tags it sets.
+const untaggedFile = "base.go"
 
-// TestDiscoverBuildTagsReturnsUserTags writes a minimal tree of .go files
-// with a mix of user-defined tags, GOOS/GOARCH values, pseudo-tags, and
-// negations, then confirms only the user-defined tags survive filtering.
-func TestDiscoverBuildTagsReturnsUserTags(t *testing.T) {
-	t.Parallel()
+// passHeader matches the line -tags=auto prints before each pass.
+var passHeader = regexp.MustCompile(`(?m)^cairnlint: pass (.+)$`)
 
-	root := t.TempDir()
+// passLabels returns the label of every pass a -tags=auto run announced, sorted.
+func passLabels(stderr string) []string {
+	matches := passHeader.FindAllStringSubmatch(stderr, -1)
 
-	writeFile(t, root, "a.go", "//go:build integration\n\npackage a\n")
-	writeFile(t, root, "sub/b.go", "//go:build e2e && !slow\n\npackage sub\n")
-	writeFile(t, root, "sub/c.go", "//go:build linux || darwin\n\npackage sub\n")
-	writeFile(t, root, "sub/d.go", "//go:build cgo\n\npackage sub\n")
-	writeFile(t, root, "sub/e.go", "//go:build go1.26\n\npackage sub\n")
-	writeFile(t, root, "sub/f.go", "//go:build custom || integration\n\npackage sub\n")
-	writeFile(t, root, "plain.go", "package root\n")
-
-	// Directories the walker must skip.
-	writeFile(t, root, "testdata/skip.go", "//go:build skipped\n\npackage skip\n")
-	writeFile(t, root, "vendor/skip.go", "//go:build vendored\n\npackage skip\n")
-	writeFile(t, root, ".hidden/skip.go", "//go:build hidden\n\npackage skip\n")
-
-	got, err := cairnlint.DiscoverBuildTags([]string{root})
-	if err != nil {
-		t.Fatalf("DiscoverBuildTags: %v", err)
+	labels := make([]string, 0, len(matches))
+	for _, match := range matches {
+		labels = append(labels, match[1])
 	}
 
-	want := []string{"custom", "e2e", integrationTag, "slow"}
+	slices.Sort(labels)
 
-	sort.Strings(got)
-
-	if !equalStringSlices(got, want) {
-		t.Errorf("tags: got %v, want %v", got, want)
-	}
+	return labels
 }
 
-// TestDiscoverBuildTagsParsesLegacyPlusBuild confirms // +build (the
-// pre-1.17 constraint syntax) is also recognized, since old repos can
-// still have files carrying it.
-func TestDiscoverBuildTagsParsesLegacyPlusBuild(t *testing.T) {
+// TestAutoTagsRunsOnePassPerUserTag plants user tags beside GOOS, cgo, and
+// Go version constraints, and tags in places the walk skips, then checks that
+// only the user tags get a pass and that each tagged file is linted.
+func TestAutoTagsRunsOnePassPerUserTag(t *testing.T) {
 	t.Parallel()
 
-	root := t.TempDir()
-
-	writeFile(t, root, "legacy.go", "// +build legacytag\n\npackage legacy\n")
-
-	got, err := cairnlint.DiscoverBuildTags([]string{root})
-	if err != nil {
-		t.Fatalf("DiscoverBuildTags: %v", err)
-	}
-
-	if !equalStringSlices(got, []string{"legacytag"}) {
-		t.Errorf("tags: got %v, want [legacytag]", got)
-	}
-}
-
-// TestDiscoverBuildTagsIgnoresNonGoFiles confirms the walker limits
-// parsing to .go files so README or config files with // +build in them
-// do not leak false tags into the set.
-func TestDiscoverBuildTagsIgnoresNonGoFiles(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-
-	writeFile(t, root, "notes.md", "//go:build fakeone\n\nsome text\n")
-	writeFile(t, root, "real.go", "//go:build realone\n\npackage p\n")
-
-	got, err := cairnlint.DiscoverBuildTags([]string{root})
-	if err != nil {
-		t.Fatalf("DiscoverBuildTags: %v", err)
-	}
-
-	if !equalStringSlices(got, []string{"realone"}) {
-		t.Errorf("tags: got %v, want [realone]", got)
-	}
-}
-
-// TestDiscoverBuildTagsHandlesTrailingWildcard confirms the "./..." and
-// "/abs/path/..." patterns get stripped down to their root dir so the
-// walker does not try to match "..." against a filesystem entry.
-func TestDiscoverBuildTagsHandlesTrailingWildcard(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-
-	writeFile(t, root, "pkg/a.go", "//go:build wildtag\n\npackage pkg\n")
-
-	got, err := cairnlint.DiscoverBuildTags([]string{root + "/..."})
-	if err != nil {
-		t.Fatalf("DiscoverBuildTags: %v", err)
-	}
-
-	if !equalStringSlices(got, []string{"wildtag"}) {
-		t.Errorf("tags: got %v, want [wildtag]", got)
-	}
-}
-
-// TestRunAutoTagsPassesMergesOutput runs the multi-pass driver against
-// /bin/echo to confirm duplicate lines collapse and per-pass headers
-// still print. Using a stub executable sidesteps the need to rebuild
-// cairnlint itself for the test.
-func TestRunAutoTagsPassesMergesOutput(t *testing.T) {
-	if _, err := os.Stat("/bin/echo"); err != nil {
-		t.Skip("/bin/echo unavailable on this platform")
-	}
-
-	root := t.TempDir()
-	writeFile(t, root, "a.go", "//go:build alpha\n\npackage a\n")
-	writeFile(t, root, "b.go", "//go:build beta\n\npackage a\n")
-
-	t.Chdir(root)
-
-	var (
-		stdout bytes.Buffer
-		stderr bytes.Buffer
-	)
-
-	// echo will ignore any -tags=<value> prefix and print the rest.
-	// Pass a fixed pattern arg so the discovery walk finds our fixtures.
-	code := cairnlint.RunAutoTagsPasses(t.Context(), &cairnlint.AutoTagsRun{
-		Stdout:     &stdout,
-		Stderr:     &stderr,
-		Executable: "/bin/echo",
-		PassArgs:   []string{wildcardPattern},
+	root := writeModule(t, map[string]string{
+		untaggedFile:       source(cleanSource, "root"),
+		"integration.go":   "//go:build integration\n\npackage root\n\n// Live runs \xe2\x80\x94 against a server.\nconst Live = 1\n",
+		"sub/base.go":      source(cleanSource, "sub"),
+		"sub/e2e.go":       "//go:build e2e && !slow\n\npackage sub\n\n// E2E runs \u2014 end to end.\nconst E2E = 1\n",
+		"sub/platform.go":  "//go:build linux || darwin\n\npackage sub\n",
+		"sub/cgo.go":       "//go:build cgo\n\npackage sub\n",
+		"sub/version.go":   "//go:build go1.21\n\npackage sub\n",
+		"sub/either.go":    "//go:build custom || integration\n\npackage sub\n",
+		"legacy/base.go":   source(cleanSource, "legacy"),
+		"legacy/legacy.go": "// +build legacytag\n\npackage legacy\n",
+		"testdata/skip.go": "//go:build skipped\n\npackage skip\n",
+		"vendor/skip.go":   "//go:build vendored\n\npackage skip\n",
+		".hidden/skip.go":  "//go:build hidden\n\npackage skip\n",
+		"notes.md":         "//go:build fakeone\n\nsome text\n",
 	})
-	if code != 0 {
-		t.Errorf("exit code: got %d, want 0", code)
+
+	run := runTool(t, root, nil, "-tags=auto", "./...")
+
+	want := []string{"-tags=custom", "-tags=e2e", integrationTags, "-tags=legacytag", "-tags=slow", "default build"}
+	if got := passLabels(run.stderr); !slices.Equal(got, want) {
+		t.Errorf("passes %v, want %v; stderr:\n%s", got, want, run.stderr)
 	}
 
-	// Each pass prints one echo line. Tags should appear when present.
-	stdoutText := stdout.String()
-
-	if !bytes.Contains(stdout.Bytes(), []byte(wildcardPattern)) {
-		t.Errorf("stdout missing pattern echo: %q", stdoutText)
-	}
-
-	stderrText := stderr.String()
-
-	if !bytes.Contains(stderr.Bytes(), []byte("pass default build")) {
-		t.Errorf("stderr missing default-build header: %q", stderrText)
-	}
-
-	if !bytes.Contains(stderr.Bytes(), []byte("pass -tags=alpha")) {
-		t.Errorf("stderr missing alpha header: %q", stderrText)
-	}
-
-	if !bytes.Contains(stderr.Bytes(), []byte("pass -tags=beta")) {
-		t.Errorf("stderr missing beta header: %q", stderrText)
-	}
-}
-
-// writeFile creates a file at root/relPath, making parent directories
-// as needed. Keeps fixture setup declarative in each test.
-func writeFile(t *testing.T, root, relPath, contents string) {
-	t.Helper()
-
-	full := filepath.Join(root, relPath)
-
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		t.Fatalf("mkdirall %s: %v", filepath.Dir(full), err)
-	}
-
-	if err := os.WriteFile(full, []byte(contents), 0o600); err != nil {
-		t.Fatalf("write %s: %v", full, err)
-	}
-}
-
-// equalStringSlices reports whether two string slices have the same
-// contents in the same order.
-func equalStringSlices(left, right []string) bool {
-	if len(left) != len(right) {
-		return false
-	}
-
-	for idx, val := range left {
-		if val != right[idx] {
-			return false
+	for _, finding := range []string{"integration.go:5:1: " + emDashMessage, "sub/e2e.go:5:1: " + emDashMessage} {
+		if !strings.Contains(run.stderr, finding) {
+			t.Errorf("stderr lacks the tagged finding %q:\n%s", finding, run.stderr)
 		}
 	}
+}
 
-	return true
+// TestAutoTagsWithoutUserTags covers a module whose only constraints are
+// reserved ones, so the default build is the only pass.
+func TestAutoTagsWithoutUserTags(t *testing.T) {
+	t.Parallel()
+
+	root := writeModule(t, map[string]string{
+		untaggedFile:  source(cleanSource, "root"),
+		"platform.go": "//go:build linux || darwin\n\npackage root\n",
+	})
+
+	run := runTool(t, root, nil, "-tags=auto", "./...")
+	if got := passLabels(run.stderr); !slices.Equal(got, []string{"default build"}) {
+		t.Errorf("passes %v, want only the default build; stderr:\n%s", got, run.stderr)
+	}
+
+	if run.code != exitClean {
+		t.Errorf("exit code %d, want %d; stderr:\n%s", run.code, exitClean, run.stderr)
+	}
+}
+
+// TestAutoTagsFailedPassDecidesExitCode checks that a pass that fails to load
+// sets the exit code even when the other passes report findings, so a broken
+// build configuration is never read as an ordinary lint failure.
+func TestAutoTagsFailedPassDecidesExitCode(t *testing.T) {
+	t.Parallel()
+
+	root := writeModule(t, map[string]string{
+		untaggedFile: source(emDashSource, "root"),
+		"broken.go":  "//go:build broken\n\npackage root\nfunc {\n",
+	})
+
+	run := runTool(t, root, nil, "-tags=auto", "./...")
+	if run.code != exitFailure {
+		t.Errorf("exit code %d, want %d from the failed pass; stderr:\n%s", run.code, exitFailure, run.stderr)
+	}
+
+	if !strings.Contains(run.stderr, untaggedFile+":3:1: "+emDashMessage) {
+		t.Errorf("the default pass's finding is missing; stderr:\n%s", run.stderr)
+	}
+}
+
+// TestAutoTagsPrintsRepeatedFindingOnce checks that a finding in an untagged
+// file, which every pass analyzes, is printed once.
+func TestAutoTagsPrintsRepeatedFindingOnce(t *testing.T) {
+	t.Parallel()
+
+	root := writeModule(t, map[string]string{
+		untaggedFile: source(emDashSource, "root"),
+		"alpha.go":   "//go:build alpha\n\npackage root\n",
+		"beta.go":    "//go:build beta\n\npackage root\n",
+	})
+
+	run := runTool(t, root, nil, "-tags=auto", "./...")
+	if got := len(passLabels(run.stderr)); got != 3 {
+		t.Fatalf("%d passes, want 3; stderr:\n%s", got, run.stderr)
+	}
+
+	if got := strings.Count(run.stderr, untaggedFile+":3:1: "+emDashMessage); got != 1 {
+		t.Errorf("the finding printed %d times, want once; stderr:\n%s", got, run.stderr)
+	}
+
+	if run.code != exitFindings {
+		t.Errorf("exit code %d, want %d", run.code, exitFindings)
+	}
 }

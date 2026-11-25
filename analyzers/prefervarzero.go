@@ -12,7 +12,8 @@ import (
 // preferVarZeroAnalyzer returns an analyzer that flags short variable
 // declarations that assign a zero value literal. Using var declarations
 // (var s string, var n int, var b bool) makes the zero-value intent
-// explicit and is the idiomatic Go style.
+// explicit and is the idiomatic Go style. Init clauses of if, for, and switch
+// statements are left alone, since a var declaration cannot stand there.
 func preferVarZeroAnalyzer() *analysis.Analyzer {
 	return &analysis.Analyzer{
 		Name:     "prefervarzero",
@@ -29,12 +30,28 @@ func runPreferVarZero(pass *analysis.Pass) (any, error) {
 	}
 
 	nodeFilter := []ast.Node{
+		(*ast.IfStmt)(nil),
+		(*ast.ForStmt)(nil),
+		(*ast.SwitchStmt)(nil),
+		(*ast.TypeSwitchStmt)(nil),
 		(*ast.AssignStmt)(nil),
 	}
 
+	// An init clause takes a simple statement, which a var declaration is
+	// not, so a short declaration there has no var form to suggest. Preorder
+	// reaches each statement before its init clause, so the set is filled in
+	// time.
+	initClauses := make(map[ast.Stmt]bool)
+
 	insp.Preorder(nodeFilter, func(node ast.Node) {
+		if init := initClause(node); init != nil {
+			initClauses[init] = true
+
+			return
+		}
+
 		assign, isAssign := node.(*ast.AssignStmt)
-		if !isAssign || assign.Tok != token.DEFINE {
+		if !isAssign || assign.Tok != token.DEFINE || initClauses[assign] {
 			return
 		}
 
@@ -57,6 +74,23 @@ func runPreferVarZero(pass *analysis.Pass) (any, error) {
 	})
 
 	return nil, nil //nolint:nilnil // analysis.Analyzer contract requires (nil, nil) for no results
+}
+
+// initClause returns the init statement of an if, for, or switch statement,
+// or nil when node is none of those or has no init clause.
+func initClause(node ast.Node) ast.Stmt {
+	switch stmt := node.(type) {
+	case *ast.IfStmt:
+		return stmt.Init
+	case *ast.ForStmt:
+		return stmt.Init
+	case *ast.SwitchStmt:
+		return stmt.Init
+	case *ast.TypeSwitchStmt:
+		return stmt.Init
+	}
+
+	return nil
 }
 
 // zeroValueSuggestion returns the var type name if expr is a zero-value

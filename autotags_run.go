@@ -11,27 +11,38 @@ import (
 	"strings"
 )
 
-// AutoTagsRun is what every pass of [RunAutoTagsPasses] shares: the streams
+// autoTagsRun is what every pass of [runAutoTagsPasses] shares: the streams
 // merged output goes to and the binary each pass runs. PassArgs holds the
 // arguments each pass forwards to that binary, and their package patterns
 // also drive tag discovery. Every field must be set, and Stdout and Stderr
 // must not be nil, because the passes write to them without a check.
-type AutoTagsRun struct {
+type autoTagsRun struct {
 	Stdout     io.Writer
 	Stderr     io.Writer
 	Executable string
 	PassArgs   []string
 }
 
-// RunAutoTagsPasses re-executes run.Executable once per user-defined build
-// tag found under run.PassArgs' patterns, plus one pass with no -tags. run
-// must not be nil. It dedupes output lines across passes and returns the
-// worst exit code. A subprocess per pass avoids the global flags and os.Exit
-// inside the multichecker driver.
-func RunAutoTagsPasses(ctx context.Context, run *AutoTagsRun) int {
+// exitDiagnostics is the status the multichecker returns when it reported
+// findings and nothing failed.
+const exitDiagnostics = 3
+
+// seenLines records the lines already written to each stream, kept apart so
+// a stderr line that matches an earlier stdout line still prints.
+type seenLines struct {
+	stdout map[string]struct{}
+	stderr map[string]struct{}
+}
+
+// runAutoTagsPasses re-executes run.Executable once per user-defined build
+// tag under run.PassArgs' patterns, plus a pass with no -tags, deduping lines
+// across passes. run must not be nil. A failed pass decides the exit code over
+// passes with findings, so a broken build never reads as a lint failure. A
+// subprocess per pass avoids the multichecker's global flags and os.Exit.
+func runAutoTagsPasses(ctx context.Context, run *autoTagsRun) int {
 	patterns := patternsFromArgs(run.PassArgs)
 
-	tags, err := DiscoverBuildTags(patterns)
+	tags, err := discoverBuildTags(patterns)
 	if err != nil {
 		_, _ = fmt.Fprintf(run.Stderr, "cairnlint: discover tags: %v\n", err)
 
@@ -42,25 +53,31 @@ func RunAutoTagsPasses(ctx context.Context, run *AutoTagsRun) int {
 	// linted even when the project has no user tags.
 	tagsets := append([]string{""}, tags...)
 
-	seen := make(map[string]struct{}, len(tagsets))
+	seen := seenLines{stdout: map[string]struct{}{}, stderr: map[string]struct{}{}}
 
-	var worst int
+	var failure, findings int
 
 	for _, tag := range tagsets {
-		code := runSingleTagPass(ctx, run, tag, seen)
-		if code > worst {
-			worst = code
+		switch code := runSingleTagPass(ctx, run, tag, seen); {
+		case code == exitDiagnostics:
+			findings = code
+		case code != 0 && failure == 0:
+			failure = code
 		}
 	}
 
-	return worst
+	if failure != 0 {
+		return failure
+	}
+
+	return findings
 }
 
 // runSingleTagPass shells out to run.Executable with run.PassArgs,
 // prepending -tags=<tag> when tag is non-empty. Output is captured and
 // forwarded through seen so duplicate diagnostics across multiple passes
 // collapse into one line in the merged output.
-func runSingleTagPass(ctx context.Context, run *AutoTagsRun, tag string, seen map[string]struct{}) int {
+func runSingleTagPass(ctx context.Context, run *autoTagsRun, tag string, seen seenLines) int {
 	label := "default build"
 	childArgs := run.PassArgs
 
@@ -86,8 +103,8 @@ func runSingleTagPass(ctx context.Context, run *AutoTagsRun, tag string, seen ma
 
 	runErr := cmd.Run()
 
-	emitUnique(run.Stdout, outBuf.Bytes(), seen)
-	emitUnique(run.Stderr, errBuf.Bytes(), seen)
+	emitUnique(run.Stdout, outBuf.Bytes(), seen.stdout)
+	emitUnique(run.Stderr, errBuf.Bytes(), seen.stderr)
 
 	if exitErr, ok := errors.AsType[*exec.ExitError](runErr); ok {
 		return exitErr.ExitCode()
@@ -103,8 +120,9 @@ func runSingleTagPass(ctx context.Context, run *AutoTagsRun, tag string, seen ma
 }
 
 // emitUnique writes each non-empty line from data to w the first time it
-// appears. A single seen map is shared across passes so the same
-// diagnostic from two tag configurations does not print twice.
+// appears. seen is shared across passes so the same diagnostic from two tag
+// configurations does not print twice, and each stream gets its own, so a
+// line only counts as a repeat within its stream.
 func emitUnique(dst io.Writer, data []byte, seen map[string]struct{}) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	// Diagnostic lines are short, but a defensive buffer cap keeps us

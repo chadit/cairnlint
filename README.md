@@ -67,8 +67,10 @@ analysis framework unless the tag is set. Two flags
 handle the usual cases.
 
 `-tags=<value>` forwards the tag into `GOFLAGS` so
-`go/packages` sees it when loading. Use this when you
-know exactly which tag you want:
+`go/packages` sees it when loading. It overrides a
+`-tags` already in `GOFLAGS`, as it would for the go
+command. Use this when you know exactly which tag you
+want:
 
 ```bash
 cairnlint -tags=integration ./test/integration/...
@@ -78,8 +80,11 @@ cairnlint -tags=integration ./test/integration/...
 target patterns, extracts user-defined build tags from
 `//go:build` and `// +build` lines, then runs cairnlint
 once per tag plus a default-build pass. Duplicate
-diagnostics across passes collapse; exit code is the
-worst observed. This is what you want in a full lint
+lines across passes collapse, separately for stdout
+and stderr. A pass that fails to load sets the exit
+code even when other passes report findings; otherwise
+the exit code is 3 when any pass reports findings.
+This is what you want in a full lint
 script that should catch every issue regardless of tag:
 
 ```bash
@@ -112,6 +117,12 @@ stderr with the full path:
 ```text
 [agent] heuristic findings written to $TMPDIR/cairnlint-agent-12345.txt
 ```
+
+cairnlint can't delete that file itself, since the caller
+reads it after the run exits. Instead, every agent-mode
+run first removes the `cairnlint-agent-<PID>.txt` files
+in that directory that are more than a day old, and
+silently skips any it can't remove.
 
 Standard diagnostics still go to stderr as usual. A run
 with no agent findings writes no file. If the temp file
@@ -203,7 +214,8 @@ The LLM's workflow looks like this:
    or flag)
 2. See the stderr summary: `[agent] heuristic findings
    written to $TMPDIR/cairnlint-agent-<PID>.txt`
-3. Read the file to see full diagnostics
+3. Read the file to see full diagnostics. It stays until
+   an agent-mode run more than a day later removes it
 4. For each finding, check whether the flagged symbol has
    legitimate non-test consumers (e.g. `rg "SymbolName"
    --type go --glob '!*_test.go'`)
